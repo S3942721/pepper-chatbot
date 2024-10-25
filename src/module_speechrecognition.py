@@ -70,6 +70,7 @@ class SpeechRecognitionModule(ALModule):
             self.memory.subscribeToEvent("EyeContact", self.getName(), "eye_contact_toggle")
             self.memory.subscribeToEvent("Speaking", self.getName(), "speaking_toggle")
             self.memory.subscribeToEvent("ControlRecording", self.getName(), "recording_toggle")
+            self.memory.subscribeToEvent("ClearSpeechRecognitionBuffer", self.getName(), "clear_buffer")
 
             # flag to indicate if we are currently recording audio
             self.isRecording = False
@@ -146,7 +147,7 @@ class SpeechRecognitionModule(ALModule):
         self.toggle_status()
 
     def speaking_toggle(self, _, is_speaking):
-        self.is_speaking = not not is_speaking
+        self.is_speaking = bool(is_speaking)
         self.toggle_status()
 
     def recording_toggle(self, _, allowed_recording):
@@ -158,6 +159,12 @@ class SpeechRecognitionModule(ALModule):
             self.start()
         else:
             self.pause()
+    
+    def clear_buffer(self, _):
+        self.buffer = []
+        self.preBuffer = []
+        self.preBufferLength = 0
+        self.startRecordingTimestamp = -1
 
     def processRemote( self, nbOfChannels, nbrOfSamplesByChannel, aTimeStamp, buffer ):
         #print("INF: SpeechRecognitionModule: Processing '%s' channels" % nbOfChannels)
@@ -192,9 +199,11 @@ class SpeechRecognitionModule(ALModule):
                 if (self.startRecordingTimestamp <= 0):
                     # initialize timestamp when we start recording
                     self.startRecordingTimestamp = timestamp
-                    self.memory.raiseEvent("Listening", "[LOGS]I'm listening to you now")
+                    self.memory.raiseEvent("Log", "I'm listening to you now")
+                    self.memory.raiseEvent("Listening", True)
                 elif ((timestamp - self.startRecordingTimestamp) > self.recordingDuration):
-                    self.memory.raiseEvent("Listening", "[LOGS]Please wait, I'm analysing what you are saying...")
+                    self.memory.raiseEvent("Log", "Analysing what you said...")
+                    self.memory.raiseEvent("Listening", False)
                     print('Max recording duration hit')
                     # check how long we are recording
                     self.stopRecordingAndRecognize()
@@ -204,7 +213,8 @@ class SpeechRecognitionModule(ALModule):
                 if (timestamp - self.lastTimeRMSPeak >= self.idleReleaseTime) and (
                         timestamp - self.startRecordingTimestamp >= self.holdTime):
                     # print(('stopping after idle/hold time'))
-                    self.memory.raiseEvent("Listening", "[LOGS]Please wait, I'm analysing what you are saying...")
+                    self.memory.raiseEvent("Log", "Analysing what you said...")
+                    self.memory.raiseEvent("Listening", False)
                     self.stopRecordingAndRecognize()
             else:
                 # constantly record into prebuffer for lookahead

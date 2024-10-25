@@ -13,6 +13,7 @@ class HealthyCheckModule(ALModule):
         
         self.memory = ALProxy("ALMemory")
         self.tablet_service = ALProxy("ALTabletService")
+        self.tablet_service.reloadPage(False)
         self.memory.subscribeToEvent("HealthyCheck", name, "pong")
         self.memory.subscribeToEvent("ControlRecording", name, "update_recording")
         self.memory.subscribeToEvent("Speaking", name, "update_speaking")
@@ -27,7 +28,7 @@ class HealthyCheckModule(ALModule):
         self.got_pong = False
         time.sleep(1)
         if not self.got_pong:
-            print("Not Got pong")
+            print("No pong from tablet, reloading webview")
             self.tablet_service.showWebview(self.webview_url)
             time.sleep(2)
             self.sync()

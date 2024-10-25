@@ -133,8 +133,12 @@ def main():
     # declear events sharing between different modules
     memory = ALProxy("ALMemory")
     memory.declareEvent("SpeechRecognition")
+    memory.declareEvent("ClearSpeechRecognitionBuffer")
     memory.declareEvent("Speaking")
+    memory.declareEvent("PepperMessage")
+    memory.declareEvent("Log")
     memory.declareEvent("Listening")
+    memory.declareEvent("UserMessage")
     memory.declareEvent("EyeContact")
     memory.declareEvent("ResetConversation")
     memory.declareEvent("HealthyCheck")

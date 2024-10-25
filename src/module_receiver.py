@@ -4,6 +4,8 @@ import time
 from tools import chat_completion
 from module_expressions import BehaviourExecutor
 import json
+import threading
+import random
 
 class BaseSpeechReceiverModule(ALModule):
     """
@@ -33,8 +35,11 @@ class BaseSpeechReceiverModule(ALModule):
         self.model_name = model_name
 
         self.speech = ALProxy('ALAnimatedSpeech')
+        self.led_service = ALProxy('ALLeds')
         self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
         self.memory.subscribeToEvent("ResetConversation", self.getName(), "reset_message")
+        self.memory.subscribeToEvent("Listening", self.getName(), "handle_listening")
+        self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
 
         self.messages = []
         self.system_prompt = system_prompt
@@ -78,13 +83,55 @@ class BaseSpeechReceiverModule(ALModule):
         print( "INF: ReceiverModule: stopping..." )
         try:
             self.memory.unsubscribe('SpeechRecognition', self.getName())
+            if hasattr(self, 'stop_listening_thread'):
+                self.stop_listening_thread.set()
+            if hasattr(self, 'listening_thread') and self.listening_thread.is_alive():
+                self.listening_thread.join()
         finally:
             print( "INF: ReceiverModule: stopped!" )
 
     def version( self ):
         return "1.1"
+    
+    def handle_speaking(self, _, speaking):
+        if speaking:
+            self.handle_listening(self, not speaking)
+    
+    def handle_listening(self, _, is_listening):
+        # Runs a thread that indefinitely runs random listening behaviours until the thread is stopped
+        print("DEBUG: Listening event received with value: {}".format(is_listening))
+        if is_listening:
+            # We are listening. We should start running "listening" behaviours
+            self.listening = True
+            self.stop_listening_thread = threading.Event()
+            self.listening_thread = threading.Thread(target=self.run_listening_behaviours, args=(self.stop_listening_thread, self.executor, self.speech))
+            self.listening_thread.start()
+            # Set the LEDs to green
+            self.led_service.fadeRGB('AllLeds', 0x00FF00, 0.5)
+        else:
+            # We have stopped listening. We should stop running "listening" behaviours
+            if hasattr(self, 'stop_listening_thread'):
+                self.stop_listening_thread.set()
+            if hasattr(self, 'listening_thread') and self.listening_thread.is_alive():
+                self.listening_thread.join()
+            # Set the LEDs to white
+            self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
 
-    def processRemote(self, signalName, message):       
+    def run_listening_behaviours(self, stop_event, executor, speech):
+        while not stop_event.is_set():
+            LISTENING_BEHAVIOURS = ['listening']
+            random_behaviour = random.choice(LISTENING_BEHAVIOURS)
+            listening_message = "^start({})^wait({})".format(random_behaviour, random_behaviour)
+            listening_message, _, _ = executor.sanitize_behaviour_requests(listening_message)
+            speech.say(listening_message)
+            time.sleep(5)
+
+    def processRemote(self, signalName, message):
+        # While we process the message, we should stop the speech recognition
+        self.memory.raiseEvent("Speaking", True)
+        # Set the LEDs to white
+        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
+
         # Do something with the received speech recognition result
         # If pepper is triggered, only respond to messages that contain the trigger keywords
         PEPPER_TRIGGER = True
@@ -94,7 +141,26 @@ class BaseSpeechReceiverModule(ALModule):
             "pipa", "pippa", "poppa", "pepor", "pepur", "pepr", "peppar", "peppur", 
             "peppor", "peppur", "pepur", "pepor", "pepr", "peppur", "peppor", "pepur"
         ]
-        THINKING_BEHAVIOURS = ['thinking', 'listening']
+        THINKING_BEHAVIOURS = ['thinking']
+        THINKING_PHRASES = [
+            "hmm", "thinking", "let's see", "one sec", "just a sec", "let me think", 
+            "hmm...", "one moment", "just thinking", "give me sec", 
+            "just thinking...", "just a moment",
+            "processing that", "processing", "hmm let's see", "just a second", 
+            "just processing", "thinking now"
+        ]
+        
+        def think_about_response(executor, speech):
+            self.memory.raiseEvent("Log", "[THINK_RESP]I heard you say \""+message+"\", let me think...")
+            # Set the LEDs to blue
+            self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
+
+            random_thinking_behaviour = random.choice(THINKING_BEHAVIOURS)
+            random_thinking_phrase = random.choice(THINKING_PHRASES)
+            thinking_message = "^start({}) {} ^wait({})".format(random_thinking_behaviour, random_thinking_phrase, random_thinking_behaviour)
+            thinking_message, _, _ = executor.sanitize_behaviour_requests(thinking_message)
+
+            speech.say(thinking_message)
 
         # the LLM will set conversation_ongoing to True if it believes the conversation is ongoing
         # When the LLM sets to false, we should reset the conversation_ongoing flag
@@ -110,6 +176,7 @@ class BaseSpeechReceiverModule(ALModule):
             if PEPPER_NAME.lower() not in message.lower():
                 print("DEBUG: Message does not contain the trigger keyword 'Pepper'.")
                 self.reset_message()
+                self.memory.raiseEvent("Speaking", False)
                 return
 
         print("DEBUG: Sanitised message: {}".format(message))
@@ -119,8 +186,10 @@ class BaseSpeechReceiverModule(ALModule):
         
         start_time = time.time()
 
-        self.memory.raiseEvent("Speaking", "[LOGS][THINK_RESP]I heard you said \""+message+"\", let me think...")
-        self.executor.execute_random_behaviour(THINKING_BEHAVIOURS)
+        # Set the LEDs to blue
+        self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
+        behaviour_thread = threading.Thread(target=think_about_response, args=(self.executor, self.speech))
+        behaviour_thread.start()
         # Send the message to the chatbot server
         resp_text = chat_completion(
         self.server_url, 
@@ -129,7 +198,8 @@ class BaseSpeechReceiverModule(ALModule):
         model_name=self.model_name, 
         api_key=self.api_key
         )
-        self.memory.raiseEvent("Speaking", None)
+        # Set the LEDs to white
+        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
         
         print("DEBUG: Received response text: {}".format(resp_text))
         print("DEBUG: Response took {} seconds.".format(time.time() - start_time))
@@ -141,6 +211,7 @@ class BaseSpeechReceiverModule(ALModule):
             resp_text = resp_text[json_start:json_end]
         else:
             print("DEBUG: No valid JSON found in response text.")
+            self.memory.raiseEvent("Speaking", False)
             return
         
         if resp_text:
@@ -153,32 +224,39 @@ class BaseSpeechReceiverModule(ALModule):
                 
                 if not chat_response:
                     print("DEBUG: Message does not contain 'chat_response' or told not to respond.")
+                    self.memory.raiseEvent("Speaking", False)
                     return
 
                 # If we want to respond, only respond if we have a chat_response
                 elif chat_response:
                     # Sanitize the chat_response to replace behaviour requests with full paths
-                    chat_response, behaviour_triggered = self.executor.sanitize_behaviour_requests(chat_response)
+                    chat_response, behaviour_triggered, spoken_response = self.executor.sanitize_behaviour_requests(chat_response)
                     resp_message = chat_response
                 
                 else:
                     print("DEBUG: Message does not contain 'chat_response'.")
+                    self.memory.raiseEvent("Speaking", False)
                     return
 
-            except (json.JSONDecodeError, KeyError) as e:
+            except (SyntaxError, KeyError) as e:
                 print("DEBUG: Failed to decode message: {}".format(e))
+                self.memory.raiseEvent("Speaking", False)
                 return
             
             behaviour_triggered = False
             
             # Only dispaly the message if the chatbot wants to respond
-            self.memory.raiseEvent("Listening", message)
+            self.memory.raiseEvent("UserMessage", message)
+            
+            # Clear speech recognition buffer
+            self.memory.raiseEvent("ClearSpeechRecognitionBuffer", None)
  
             print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
-            self.memory.raiseEvent("Speaking", resp_message)
+            self.memory.raiseEvent("PepperMessage", spoken_response)
+            # self.memory.raiseEvent("Speaking", True)
             self.speech.say(resp_message)
-            self.memory.raiseEvent("Speaking", None)
-            self.messages.append({'role':'assistant','content':resp_message})
+            # self.memory.raiseEvent("Speaking", False)
+            self.messages.append({'role':'assistant','content':resp_text})
 
             if self.save_csv:
                 with open('dialogue.csv', 'a') as f:
@@ -187,3 +265,5 @@ class BaseSpeechReceiverModule(ALModule):
                     if behaviour_triggered:
                         f.write('behaviour triggered,"'+behaviour_triggered.replace('"', '\\"')+'"\n')
                     f.close()
+
+            self.memory.raiseEvent("Speaking", False)

@@ -18,17 +18,15 @@ class BehaviourExecutor:
         Example:
             "^start(hey) Goodbye ^wait(hey)” will become "^start(animations/Stand/Gestures/Hey_4) Goodbye ^wait(animations/Stand/Gestures/Hey_4)"
         """
-
         print("Sanitizing chat response: '{}'".format(chat_response))
-        
         # Dictionary to store the mapping of keywords to selected behaviours
         keyword_to_behaviour = {}
-        behaviour_triggered = False
+        behaviour_triggered = [False]  # Use a list to allow modification in nested function
 
         # Function to replace keywords with full animation paths
         def replace_keyword(match):
-            global behaviour_triggered
             keyword = match.group(2)
+
             if keyword not in keyword_to_behaviour:
                 # Search for the behaviour key in the behaviours
                 behaviour = next((b for b in self.behaviours if b['behaviour_key'] == keyword), None)
@@ -36,7 +34,7 @@ class BehaviourExecutor:
                     selected_behaviour = random.choice(behaviour['behaviour_variations'])
                     keyword_to_behaviour[keyword] = selected_behaviour
                     print("Keyword '{}' mapped to behaviour: {}".format(keyword, selected_behaviour))
-                    behaviour_triggered = True
+                    behaviour_triggered[0] = True
                 else:
                     print("No behaviour found for keyword: '{}'".format(keyword))
                     return match.group(0)  # Return the original match if no behaviour is found
@@ -45,10 +43,14 @@ class BehaviourExecutor:
         # Replace all occurrences of the keywords in the chat response
         sanitized_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, chat_response)
         
+        # Remove behaviour actions to create spoken response
+        spoken_response = re.sub(r'\^(start|wait|stop|run)\([^\)]*\)', '', chat_response).strip()
+        
         print("Sanitized chat response: '{}'".format(sanitized_response))
-        return sanitized_response, behaviour_triggered
+        print("Spoken response: '{}'".format(spoken_response))
+        return sanitized_response, behaviour_triggered[0], spoken_response
 
-    def execute_behaviour(self, behaviour_key):
+    def execute_behaviour(self, behaviour_key, nao_ip, nao_port):
         """
         Execute a behaviour based on the behaviour key
         
@@ -61,10 +63,15 @@ class BehaviourExecutor:
         if behaviour:
             selected_behaviour = random.choice(behaviour['behaviour_variations'])
             print("Executing behaviour: {}".format(selected_behaviour))
+            
+            # Convert selected_behaviour to string if it is not
+            if not isinstance(selected_behaviour, str):
+                selected_behaviour = str(selected_behaviour)
+
             # Execute the behaviour using ALBehaviorManager
             try:
-                behaviour_manager = ALProxy("ALBehaviorManager")
-                behaviour_manager.runBehavior(selected_behaviour)
+                animation_player_service = ALProxy("ALAnimationPlayer", nao_ip, nao_port)
+                animation_player_service.run(selected_behaviour, _async=True)
                 return selected_behaviour
             except Exception as e:
                 print("Error executing behaviour: {}".format(e))
@@ -72,7 +79,7 @@ class BehaviourExecutor:
             print("No behaviour found for key: '{}'".format(behaviour_key))
         return None
     
-    def execute_random_behaviour(self, behaviour_keys):
+    def execute_random_behaviour(self, behaviour_keys, nao_ip, nao_port):
         """
         Execute a behaviour based on multiple behaviour keys. It will pick a single random behaviour from the list of keys.
         
@@ -80,7 +87,7 @@ class BehaviourExecutor:
         The behaviour is selected randomly from the available variations.
         The full path to the animation is returned.
         """
-        self.execute_behaviour(random.choice(behaviour_keys))
+        self.execute_behaviour(random.choice(behaviour_keys), nao_ip, nao_port)
         
         
 # Example usage:

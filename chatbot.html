@@ -230,12 +230,8 @@ QiSession(function(session) {
 
         function speakingCallback(value) {
             wakeUp()
-            if(value.indexOf('[LOGS]') === 0) {
-                setLog(value.substring(6))
-            } else {
-                value && addBubble('assistant', value, false)
-                setLog("Here's my answer")
-            }
+            value && addBubble('assistant', value, false)
+            setLog("Here's my answer")
         }
 
         function handleStopping(send_event) {
@@ -251,17 +247,19 @@ QiSession(function(session) {
                 setLog('What I heard is: ' + value)
             });
         });
-        ALMemory.subscriber("Listening").then(function(subscriber) {
+        ALMemory.subscriber("UserMessage").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
                 wakeUp()
-                if(value.indexOf('[LOGS]') === 0) {
-                    setLog(value.substring(6))
-                } else {
-                    addBubble('user', value, false)
-                }
+                addBubble('user', value, false)
             });
         });
-        ALMemory.subscriber("Speaking").then(function(subscriber) {
+        ALMemory.subscriber("Log").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                wakeUp()
+                setLog(value.substring(0))
+            });
+        });
+        ALMemory.subscriber("PepperMessage").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
                 speakingCallback(value)
             });

@@ -67,3 +67,6 @@ venv/
 
 .env
 *.csv
+
+# Password file
+.pepper_password
