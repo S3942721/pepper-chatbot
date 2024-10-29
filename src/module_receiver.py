@@ -40,6 +40,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("ResetConversation", self.getName(), "reset_message")
         self.memory.subscribeToEvent("Listening", self.getName(), "handle_listening")
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
+        self.memory.subscribeToEvent("ControlRecording", self.getName(), "handle_change_recording")
 
         self.messages = []
         self.system_prompt = system_prompt
@@ -156,6 +157,11 @@ class BaseSpeechReceiverModule(ALModule):
         
         # Set the LEDs to white
         self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
+
+    def handle_change_recording(self, _, recording):
+        if not recording:
+            print("DEBUG: Stopping all speech.")
+            self.speech.say("", True) #FIXME - make it actually work
 
     def processRemote(self, signalName, message):
         # While we process the message, we should stop the speech recognition
