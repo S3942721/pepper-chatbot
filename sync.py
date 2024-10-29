@@ -10,6 +10,8 @@ LOCAL_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 HTML_FILE = "chatbot.html"
 HTML_REMOTE_PATH = "~/.local/share/PackageManager/apps/rmit-race/html/chatbot.html"
 PASSWORD_FILE = ".pepper_password"
+REMOTE_JSON_FILE = "pepperchat/behaviours/behaviours_described.json"
+LOCAL_JSON_FILE = os.path.join(LOCAL_FOLDER, "robot_behaviours_described.json")
 
 def run_command(command):
     """Run a shell command and print it."""
@@ -21,6 +23,10 @@ def run_command(command):
     print(result.stdout)
 
 def sync_files(remote_ip):
+    # Copy the behaviours_described.json file from the remote system to the local system
+    json_copy_command = f"sshpass -f {PASSWORD_FILE} scp {REMOTE_USER}@{remote_ip}:{REMOTE_JSON_FILE} {LOCAL_JSON_FILE}"
+    run_command(json_copy_command)
+    
     """Sync local files to the remote system."""
     # Remove the existing folder on the remote system
     remove_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'rm -rf {REMOTE_FOLDER}'"
