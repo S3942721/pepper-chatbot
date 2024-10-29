@@ -56,6 +56,34 @@ class BaseSpeechReceiverModule(ALModule):
 
         print("DEBUG: Initializing BehaviourExecutor with behaviour_file: {}".format(self.behaviour_file))
         self.executor = BehaviourExecutor(self.behaviour_file)
+        
+        TESTING_BEHAVIOURS = False
+        
+        if TESTING_BEHAVIOURS:
+            index = 0
+            previous_description = "<NO DESCRIPTION>"
+            while index != -1:
+                animation_test, index = self.executor.get_next_behaviour(index, previous_description)
+                if animation_test:
+                    animation_test = str(self.executor.sanitize_behaviour_requests(animation_test)[0])
+                    print("DEBUG: Running test behaviour: {}".format(animation_test))
+                    self.speech.say(animation_test)
+                    
+                    # Wait for user input for the behaviour description
+                    try:
+                        description = None #raw_input("Enter behaviour description (or press Enter to skip): ").strip()
+                    except EOFError:
+                        description = "<NO DESCRIPTION>"
+                    
+                    if not description:
+                        description = "<NO DESCRIPTION>"
+                    
+                    # Log the behaviour and description
+                    print("DEBUG: Behaviour: {}, Description: {}".format(animation_test, description))
+                    previous_description = description
+                else:
+                    break
+
 
     # __init__ - end
     def __del__( self ):
@@ -106,25 +134,28 @@ class BaseSpeechReceiverModule(ALModule):
             self.stop_listening_thread = threading.Event()
             self.listening_thread = threading.Thread(target=self.run_listening_behaviours, args=(self.stop_listening_thread, self.executor, self.speech))
             self.listening_thread.start()
-            # Set the LEDs to green
-            self.led_service.fadeRGB('AllLeds', 0x00FF00, 0.5)
         else:
             # We have stopped listening. We should stop running "listening" behaviours
             if hasattr(self, 'stop_listening_thread'):
                 self.stop_listening_thread.set()
             if hasattr(self, 'listening_thread') and self.listening_thread.is_alive():
                 self.listening_thread.join()
-            # Set the LEDs to white
-            self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
+            # # Set the LEDs to white
+            # self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
 
     def run_listening_behaviours(self, stop_event, executor, speech):
         while not stop_event.is_set():
+            # Set the LEDs to green
+            self.led_service.fadeRGB('AllLeds', 0x00FF00, 0.1)
             LISTENING_BEHAVIOURS = ['listening']
             random_behaviour = random.choice(LISTENING_BEHAVIOURS)
             listening_message = "^start({})^wait({})".format(random_behaviour, random_behaviour)
             listening_message, _, _ = executor.sanitize_behaviour_requests(listening_message)
             speech.say(listening_message)
             time.sleep(5)
+        
+        # Set the LEDs to white
+        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
 
     def processRemote(self, signalName, message):
         # While we process the message, we should stop the speech recognition
@@ -139,9 +170,10 @@ class BaseSpeechReceiverModule(ALModule):
         PEPPER_TRIGGER_KEYWORDS = [
             "pepper", "peper", "peppa", "pepa", "papa", "pappa", "piper", "pipper", 
             "pipa", "pippa", "poppa", "pepor", "pepur", "pepr", "peppar", "peppur", 
-            "peppor", "peppur", "pepur", "pepor", "pepr", "peppur", "peppor", "pepur"
+            "peppor", "peppur", "pepur", "pepor", "pepr", "peppur", "peppor", "pepur",
+            "paper"
         ]
-        THINKING_BEHAVIOURS = ['thinking']
+        THINKING_BEHAVIOURS = ['thinking', 'think', 'thoughtful']
         THINKING_PHRASES = [
             "hmm", "thinking", "let's see", "one sec", "just a sec", "let me think", 
             "hmm...", "one moment", "just thinking", "give me sec", 
@@ -154,13 +186,21 @@ class BaseSpeechReceiverModule(ALModule):
             self.memory.raiseEvent("Log", "[THINK_RESP]I heard you say \""+message+"\", let me think...")
             # Set the LEDs to blue
             self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
-
+            
             random_thinking_behaviour = random.choice(THINKING_BEHAVIOURS)
             random_thinking_phrase = random.choice(THINKING_PHRASES)
             thinking_message = "^start({}) {} ^wait({})".format(random_thinking_behaviour, random_thinking_phrase, random_thinking_behaviour)
             thinking_message, _, _ = executor.sanitize_behaviour_requests(thinking_message)
 
             speech.say(thinking_message)
+
+        def eyes_thinking_about_response():
+            # Animate the eyes to show thinking
+            start_thinking_time = time.time()
+            self.led_service.rotateEyes(0x0000FF, 1, 3)
+            end_thinking_time = time.time()
+            print("DEBUG: Time taken for thinking animation: {} seconds.".format(end_thinking_time - start_thinking_time))
+
 
         # the LLM will set conversation_ongoing to True if it believes the conversation is ongoing
         # When the LLM sets to false, we should reset the conversation_ongoing flag
@@ -190,6 +230,10 @@ class BaseSpeechReceiverModule(ALModule):
         self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
         behaviour_thread = threading.Thread(target=think_about_response, args=(self.executor, self.speech))
         behaviour_thread.start()
+
+        eyes_thread = threading.Thread(target=eyes_thinking_about_response)
+        eyes_thread.start()
+
         # Send the message to the chatbot server
         resp_text = chat_completion(
         self.server_url, 
@@ -198,6 +242,13 @@ class BaseSpeechReceiverModule(ALModule):
         model_name=self.model_name, 
         api_key=self.api_key
         )
+        
+        # Stop eyes thread
+        eyes_thread.join()
+        
+        # Stop behaviour thread
+        behaviour_thread.join()
+        
         # Set the LEDs to white
         self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
         

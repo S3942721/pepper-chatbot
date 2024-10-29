@@ -162,9 +162,9 @@ class SpeechRecognitionModule(ALModule):
     
     def clear_buffer(self, _):
         self.buffer = []
-        self.preBuffer = []
-        self.preBufferLength = 0
-        self.startRecordingTimestamp = -1
+        # self.preBuffer = []
+        # self.preBufferLength = 0
+        # self.startRecordingTimestamp = -1
 
     def processRemote( self, nbOfChannels, nbrOfSamplesByChannel, aTimeStamp, buffer ):
         #print("INF: SpeechRecognitionModule: Processing '%s' channels" % nbOfChannels)

@@ -6,7 +6,8 @@ from naoqi import ALProxy
 
 class BehaviourExecutor:
     def __init__(self, behaviours_file):
-        with open(behaviours_file, 'r') as file:
+        self.behaviours_file = behaviours_file
+        with open(self.behaviours_file, 'r') as file:
             self.behaviours = json.load(file)
 
     def sanitize_behaviour_requests(self, chat_response):
@@ -95,3 +96,37 @@ class BehaviourExecutor:
 # sanitized_response, behaviour_triggered = executor.sanitize_behaviour_requests("^start(hey) Goodbye ^wait(hey)")
 # print(sanitized_response, behaviour_triggered)
 # >> ^start(animations/Stand/Gestures/Hey_4) Goodbye ^wait(animations/Stand/Gestures/Hey_4) True
+    def get_next_behaviour(self, index=0, previous_bhv_description="<NO DESCRIPTION>"):
+        """
+        Get the next behaviour in the sequence based on the previous one.
+        
+        This function will also update the description of the previous behaviour in the JSON file.
+        
+        Returns the next behaviour command and the next index.
+        """
+        def update_behaviour_description(current_index, description):
+            """
+            Update the description of the behaviour at the given index.
+            """
+            if 0 <= current_index < len(self.behaviours):
+                current_description = self.behaviours[current_index].get('action_description', "<NO DESCRIPTION>")
+                if current_description == "<NO DESCRIPTION>" or description != "<NO DESCRIPTION>":
+                    self.behaviours[current_index]['action_description'] = description
+                    with open(self.behaviours_file, 'w') as file:
+                        json.dump(self.behaviours, file, indent=4)
+                    print("Updated behaviour at index {} with description: {}".format(current_index, description))
+
+        # Update the description of the previous behaviour if it was actually run
+        if index > 0 and self.behaviours[index - 1].get('action_description', "<NO DESCRIPTION>") == "<NO DESCRIPTION>":
+            update_behaviour_description(index - 1, previous_bhv_description)
+
+        # Find the next behaviour without a description
+        while index < len(self.behaviours):
+            behaviour = self.behaviours[index]
+            if behaviour.get('action_description', "<NO DESCRIPTION>") == "<NO DESCRIPTION>":
+                return "{} ^run({})".format(behaviour['behaviour_key'], behaviour['behaviour_key']), index + 1
+            else:
+                print("Skipped: {}".format(behaviour['action_description']))
+            index += 1
+
+        return None, index

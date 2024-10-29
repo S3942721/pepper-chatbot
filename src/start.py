@@ -129,7 +129,17 @@ def main():
         p.exit()  # kill previous instance, useful for developing ;)
     except:
         pass
-
+    
+    asr = ALProxy("ALSpeechRecognition")
+    asr.setAudioExpression(False)
+    asr.setVisualExpression(False)
+    # asr.subscribe("ASR_Engine")
+    # asr.unsubscribe("ASR_Engine")
+    
+    # Set all LEDs to white
+    led_service = ALProxy('ALLeds')
+    led_service.fadeRGB('AllLeds', 0xffffff, 0.1)
+    
     # declear events sharing between different modules
     memory = ALProxy("ALMemory")
     memory.declareEvent("SpeechRecognition")
