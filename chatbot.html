@@ -101,18 +101,25 @@ div {
 .buttons {
     width: 10%;
     position: absolute;
-    left: 0;
     top: 0;
-    padding: 10px;
+    height: 100%;
+}
+.buttons.left {
+    left: 0;
+}
+
+.buttons.right {
+    right: 0;
 }
 
 .buttons > .btn {
-    width: fit-content;
-    height: fit-content;
+    width: 100%;
+    height: 50%;
     color: gray;
     position: relative;
-    margin: auto;
-    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid gray;
 }
 
 .buttons > .btn > svg {
@@ -120,6 +127,11 @@ div {
     margin: auto;
     width: 30px;
     height: 30px;
+}
+
+#record-control.recording {
+    background-color: red;
+    color: white;
 }
     </style>
     <script src="http://198.18.0.1/libs/qimessaging/2/qimessaging.js"></script>
@@ -132,14 +144,16 @@ div {
             </div>
             <div id="logs">Please wait a second, I'm still not prepared...</div>
         </div>
-        <div class="buttons">
+        <div class="buttons left">
             <div id="reset" class="btn">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/>
                     <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>
                 </svg>
             </div>
-            <div id="record-control" class="btn"></div>
+            <div id="record-control" class="btn recording"></div>
+        </div>
+        <div class="buttons right">
         </div>
     </div>
 </body>
@@ -239,6 +253,7 @@ QiSession(function(session) {
             stopped = !stopped;
             stopped && setLog("Recording paused");
             record_controller.innerHTML = stopped ? START_RECORD : PAUSE_RECORD;
+            record_controller.classList.toggle('recording', !stopped)
         }
 
         ALMemory.subscriber("SpeechRecognition").then(function(subscriber) {

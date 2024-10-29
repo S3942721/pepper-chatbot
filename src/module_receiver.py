@@ -37,12 +37,13 @@ class BaseSpeechReceiverModule(ALModule):
         self.speech = ALProxy('ALAnimatedSpeech')
         self.led_service = ALProxy('ALLeds')
         self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
-        self.memory.subscribeToEvent("ResetConversation", self.getName(), "reset_message")
+        self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
         self.memory.subscribeToEvent("Listening", self.getName(), "handle_listening")
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
         self.memory.subscribeToEvent("ControlRecording", self.getName(), "handle_change_recording")
 
         self.messages = []
+        self.messages_to_llm = []
         self.system_prompt = system_prompt
         self.reset_message()
 
@@ -92,15 +93,18 @@ class BaseSpeechReceiverModule(ALModule):
         self.stop()
 
     def sync_messages(self):
-        msg = self.messages
-        if self.system_prompt: msg = [i for i in self.messages if i['role'] != 'system']
-        self.memory.raiseEvent("SyncMessages", json.dumps(msg))
+        self.memory.raiseEvent("SyncMessages", json.dumps(self.messages))
+
+    def clear_all(self):
+        self.reset_message()
+        self.conversation_ongoing = False
 
     def reset_message(self):
-        self.messages = [{
+        self.messages_to_llm = [{
             "role":"system",
             "content": self.system_prompt or "You are an assistant names Pepper, your job is to answer users' questions in short."
         }]
+        self.messages = []
         self.sync_messages()
 
     def start( self ):
@@ -177,7 +181,7 @@ class BaseSpeechReceiverModule(ALModule):
             "pepper", "peper", "peppa", "pepa", "papa", "pappa", "piper", "pipper", 
             "pipa", "pippa", "poppa", "pepor", "pepur", "pepr", "peppar", "peppur", 
             "peppor", "peppur", "pepur", "pepor", "pepr", "peppur", "peppor", "pepur",
-            "paper"
+            "paper", "people"
         ]
         THINKING_BEHAVIOURS = ['thinking', 'think', 'thoughtful']
         THINKING_PHRASES = [
@@ -227,7 +231,9 @@ class BaseSpeechReceiverModule(ALModule):
 
         print("DEBUG: Sanitised message: {}".format(message))
         
-        self.messages.append({'role':'user', 'content': message})
+        user_msg = {'role':'user', 'content': message}
+        self.messages.append(user_msg)
+        self.messages_to_llm.append(user_msg)
         self.sync_messages()
         
         start_time = time.time()
@@ -242,11 +248,11 @@ class BaseSpeechReceiverModule(ALModule):
 
         # Send the message to the chatbot server
         resp_text = chat_completion(
-        self.server_url, 
-        self.messages, 
-        route=self.base_route, 
-        model_name=self.model_name, 
-        api_key=self.api_key
+            self.server_url, 
+            self.messages_to_llm, 
+            route=self.base_route, 
+            model_name=self.model_name, 
+            api_key=self.api_key
         )
         
         # Stop eyes thread
@@ -313,7 +319,10 @@ class BaseSpeechReceiverModule(ALModule):
             # self.memory.raiseEvent("Speaking", True)
             self.speech.say(resp_message)
             # self.memory.raiseEvent("Speaking", False)
-            self.messages.append({'role':'assistant','content':resp_text})
+            if(len(self.messages_to_llm) > 1):
+                self.messages.append({'role':'assistant','content':resp_message})
+                self.messages_to_llm.append({'role':'assistant','content':resp_text})
+                self.sync_messages()
 
             if self.save_csv:
                 with open('dialogue.csv', 'a') as f:

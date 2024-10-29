@@ -72,6 +72,7 @@ class SpeechRecognitionModule(ALModule):
             self.memory.subscribeToEvent("Speaking", self.getName(), "speaking_toggle")
             self.memory.subscribeToEvent("ControlRecording", self.getName(), "recording_toggle")
             self.memory.subscribeToEvent("ClearSpeechRecognitionBuffer", self.getName(), "clear_buffer")
+            self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
 
             # flag to indicate if we are currently recording audio
             self.isRecording = False
@@ -129,6 +130,10 @@ class SpeechRecognitionModule(ALModule):
         audio.setClientPreferences( self.getName(),  SAMPLE_RATE, nNbrChannelFlag, nDeinterleave ) # setting same as default generate a bug !?!
         audio.subscribe( self.getName() )
 
+    def clear_all(self):
+        self.clear_buffer()
+        self.memory.raiseEvent("Listening", False)
+
     def pause(self):
         if not self.isStarted:
             return
@@ -156,6 +161,7 @@ class SpeechRecognitionModule(ALModule):
     def recording_toggle(self, _, allowed_recording):
         self.is_allowed_recording = allowed_recording
         self.toggle_status()
+        self.memory.raiseEvent("ResetConversation", True)
 
     def toggle_status(self):
         if self.eye_contact and not self.is_speaking and self.is_allowed_recording:
