@@ -15,6 +15,7 @@ load_env()
 
 NAO_IP = os.getenv('NAO_IP') or "localhost"
 NAO_PORT = toint(os.getenv('NAO_PORT')) or 9559
+DEFAULT_VOLUME = toint(os.getenv('DEFAULT_VOLUME')) or 50
 
 # server
 URL = os.getenv('URL')
@@ -30,6 +31,9 @@ WEBVIEW = os.getenv('WEBVIEW') or ''
 
 def main():
     parser = OptionParser()
+    parser.add_option("--volume",
+        help="The volume of the robot, default 50",
+        dest="volume")
     parser.add_option("--ip",
         help="Parent broker port. The IP address or your robot",
         dest="ip")
@@ -72,6 +76,7 @@ def main():
         help="Start a webview server when this script starts. Speficy the url of webview.",
         dest="webview")
     parser.set_defaults(
+        volume=DEFAULT_VOLUME,
         ip=NAO_IP,
         port=NAO_PORT,
         server_url=URL,
@@ -89,6 +94,7 @@ def main():
 
     opts = parser.parse_args()[0]
 
+    volume = toint(opts.volume)
     ip   = opts.ip
     port = toint(opts.port)
     server_url = opts.server_url
@@ -166,7 +172,7 @@ def main():
     global SpeechRecognition
     SpeechRecognition = SpeechRecognitionModule(
         "SpeechRecognition", ip, port,
-        speech_recoginition_url, speech_route, speech_api_key
+        speech_recoginition_url, speech_route, speech_api_key, volume
     )
 
     global EyeContact
