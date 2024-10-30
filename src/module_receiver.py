@@ -153,7 +153,7 @@ class BaseSpeechReceiverModule(ALModule):
             listening_message = "^start({})^wait({})".format(random_behaviour, random_behaviour)
             listening_message, _, _ = executor.sanitize_behaviour_requests(listening_message)
             speech.say(listening_message)
-            time.sleep(5)
+            time.sleep(3)
         
         # Set the LEDs to white
         self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
