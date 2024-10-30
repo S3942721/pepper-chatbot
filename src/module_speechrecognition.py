@@ -24,9 +24,9 @@ from numpy import sqrt, mean, square
 import traceback
 
 
-RECORDING_DURATION = 10      # seconds, maximum recording time, also default value for startRecording(), Google Speech API only accepts up to about 10-15 seconds
+RECORDING_DURATION = 12      # seconds, maximum recording time, also default value for startRecording(), Google Speech API only accepts up to about 10-15 seconds
 LOOKAHEAD_DURATION = 1.0    # seconds, for auto-detect mode: amount of seconds before the threshold trigger that will be included in the request
-IDLE_RELEASE_TIME = 2.0     # seconds, for auto-detect mode: idle time (RMS below threshold) after which we stop recording and recognize
+IDLE_RELEASE_TIME = 1.5     # seconds, for auto-detect mode: idle time (RMS below threshold) after which we stop recording and recognize
 HOLD_TIME = 2.0             # seconds, minimum recording time after we started recording (autodetection)
 SAMPLE_RATE = 48000         # Hz, be careful changing this, both google and Naoqi have requirements!
 
@@ -44,7 +44,7 @@ class SpeechRecognitionModule(ALModule):
     Your callback needs to be a method with two parameter (variable name, value).
     """
 
-    def __init__( self, strModuleName, strNaoIp, port, stt_url, stt_route='/speech/recognition', stt_api_key='no-key' ):
+    def __init__( self, strModuleName, strNaoIp, port, stt_url, stt_route='/speech/recognition', stt_api_key='no-key', volume = 0 ):
         try:
             ALModule.__init__(self, strModuleName )
 
@@ -58,6 +58,7 @@ class SpeechRecognitionModule(ALModule):
             self.stt_url = stt_url
             self.stt_route = stt_route
             self.stt_api_key = stt_api_key
+            self.volume = volume
 
             # self.inited = False
             self.isStarted = False
@@ -122,6 +123,7 @@ class SpeechRecognitionModule(ALModule):
         self.isStarted = True
 
         audio = ALProxy( "ALAudioDevice")
+        audio.setOutputVolume(self.volume)
         nNbrChannelFlag = 0 # ALL_Channels: 0,  AL::LEFTCHANNEL: 1, AL::RIGHTCHANNEL: 2 AL::FRONTCHANNEL: 3  or AL::REARCHANNEL: 4.
         nDeinterleave = 0
         audio.setClientPreferences( self.getName(),  SAMPLE_RATE, nNbrChannelFlag, nDeinterleave ) # setting same as default generate a bug !?!
@@ -134,6 +136,7 @@ class SpeechRecognitionModule(ALModule):
         self.isStarted = False
 
         audio = ALProxy("ALAudioDevice")
+        audio.setOutputVolume(0)
         audio.unsubscribe(self.getName())
 
         # print("INF: SpeechRecognitionModule: stopped!")
