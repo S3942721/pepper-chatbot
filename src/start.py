@@ -139,12 +139,19 @@ def main():
     asr = ALProxy("ALSpeechRecognition")
     asr.setAudioExpression(False)
     asr.setVisualExpression(False)
-    # asr.subscribe("ASR_Engine")
-    # asr.unsubscribe("ASR_Engine")
     
     # Set all LEDs to white
     led_service = ALProxy('ALLeds')
-    led_service.fadeRGB('AllLeds', 0xffffff, 0.1)
+    led_service.fadeRGB('AllLeds', 0xffffff, 0.5)
+    
+    audio = ALProxy( "ALAudioDevice")
+    audio.setOutputVolume(volume)
+    print("INF: SpeechRecognitionModule: volume set to %s" % volume)
+    
+    aba = ALProxy("ALBasicAwareness")
+    aba.setEnabled(True)
+    aba.setEngagementMode("FullyEngaged") # Unengaged, FullyEngaged, SemiEngaged TODO: tweak this
+    aba.setTrackingMode("MoveContextually") # Head, WholeBody, MoveContextually, BodyRotation TODO: tweak this
     
     # declear events sharing between different modules
     memory = ALProxy("ALMemory")

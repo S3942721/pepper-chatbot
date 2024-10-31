@@ -40,7 +40,6 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
         self.memory.subscribeToEvent("Listening", self.getName(), "handle_listening")
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
-        self.memory.subscribeToEvent("ControlRecording", self.getName(), "handle_change_recording")
 
         self.messages = []
         self.messages_to_llm = []
@@ -95,7 +94,7 @@ class BaseSpeechReceiverModule(ALModule):
     def sync_messages(self):
         self.memory.raiseEvent("SyncMessages", json.dumps(self.messages))
 
-    def clear_all(self):
+    def clear_all(self, _, value):
         self.reset_message()
         self.conversation_ongoing = False
 
@@ -152,22 +151,18 @@ class BaseSpeechReceiverModule(ALModule):
         while not stop_event.is_set():
             # Set the LEDs to green
             self.led_service.fadeRGB('AllLeds', 0x00FF00, 0.1)
-            LISTENING_BEHAVIOURS = ['listening']
-            random_behaviour = random.choice(LISTENING_BEHAVIOURS)
-            listening_message = "^start({})^wait({})".format(random_behaviour, random_behaviour)
-            listening_message, _, _ = executor.sanitize_behaviour_requests(listening_message)
-            speech.say(listening_message)
+            # LISTENING_BEHAVIOURS = ['listening'] # FIXME: This might be doing weird things....
+            # random_behaviour = random.choice(LISTENING_BEHAVIOURS)
+            # listening_message = "^start({})^wait({})".format(random_behaviour, random_behaviour)
+            # listening_message, _, _ = executor.sanitize_behaviour_requests(listening_message)
+            # speech.say(listening_message)
             time.sleep(3)
         
         # Set the LEDs to white
-        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
-
-    def handle_change_recording(self, _, recording):
-        if not recording:
-            print("DEBUG: Stopping all speech.")
-            self.speech.say("", True) #FIXME - make it actually work
+        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
 
     def processRemote(self, signalName, message):
+        print("DEBUG: Received message: {}".format(message))
         # While we process the message, we should stop the speech recognition
         self.memory.raiseEvent("Speaking", True)
         # Set the LEDs to white
@@ -181,15 +176,16 @@ class BaseSpeechReceiverModule(ALModule):
             "pepper", "peper", "peppa", "pepa", "papa", "pappa", "piper", "pipper", 
             "pipa", "pippa", "poppa", "pepor", "pepur", "pepr", "peppar", "peppur", 
             "peppor", "peppur", "pepur", "pepor", "pepr", "peppur", "peppor", "pepur",
-            "paper", "people"
+            "paper", "people", "heather", "pepperoni", "feather", "baby", "puppy", "peppy",
+            "poppy", "pippy"
         ]
         THINKING_BEHAVIOURS = ['thinking', 'think', 'thoughtful']
         THINKING_PHRASES = [
-            "hmm", "thinking", "let's see", "one sec", "just a sec", "let me think", 
-            "hmm...", "one moment", "just thinking", "give me sec", 
+            "hmm one moment", "thinking", "let's see", "one sec", "just a sec", "let me think", 
+            "hmm... one sec", "one moment", "just thinking", "give me sec", 
             "just thinking...", "just a moment",
-            "processing that", "processing", "hmm let's see", "just a second", 
-            "just processing", "thinking now"
+            "processing that", "hmmm just a sec", "hmm let's see", "just a second", 
+            "just processing", "thinking now", "thinking about that"
         ]
         
         def think_about_response(executor, speech):
@@ -199,18 +195,14 @@ class BaseSpeechReceiverModule(ALModule):
             
             random_thinking_behaviour = random.choice(THINKING_BEHAVIOURS)
             random_thinking_phrase = random.choice(THINKING_PHRASES)
-            thinking_message = "^start({}) {} ^wait({})".format(random_thinking_behaviour, random_thinking_phrase, random_thinking_behaviour)
+            thinking_message = "^start({}) {} ^stop({})".format(random_thinking_behaviour, random_thinking_phrase, random_thinking_behaviour)
             thinking_message, _, _ = executor.sanitize_behaviour_requests(thinking_message)
 
             speech.say(thinking_message)
 
         def eyes_thinking_about_response():
             # Animate the eyes to show thinking
-            start_thinking_time = time.time()
             self.led_service.rotateEyes(0x0000FF, 1, 3)
-            end_thinking_time = time.time()
-            print("DEBUG: Time taken for thinking animation: {} seconds.".format(end_thinking_time - start_thinking_time))
-
 
         # the LLM will set conversation_ongoing to True if it believes the conversation is ongoing
         # When the LLM sets to false, we should reset the conversation_ongoing flag
@@ -235,8 +227,6 @@ class BaseSpeechReceiverModule(ALModule):
         self.messages.append(user_msg)
         self.messages_to_llm.append(user_msg)
         self.sync_messages()
-        
-        start_time = time.time()
 
         # Set the LEDs to blue
         self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
@@ -245,6 +235,9 @@ class BaseSpeechReceiverModule(ALModule):
 
         eyes_thread = threading.Thread(target=eyes_thinking_about_response)
         eyes_thread.start()
+
+        start_time = time.time()
+        print("DEBUG: Sending message to chatbot server")
 
         # Send the message to the chatbot server
         resp_text = chat_completion(
@@ -255,17 +248,20 @@ class BaseSpeechReceiverModule(ALModule):
             api_key=self.api_key
         )
         
+        print("DEBUG: Response took {} seconds.".format(time.time() - start_time))
+        print("DEBUG: Received response text: {}".format(resp_text))
+        
         # Stop eyes thread
         eyes_thread.join()
+        print("After eyes_thread.join()")
         
-        # Stop behaviour thread
-        behaviour_thread.join()
+        # Forcibly stop behaviour thread
+        if behaviour_thread.is_alive():
+            self.stop_listening_thread.set()
+            behaviour_thread.join()
         
         # Set the LEDs to white
         self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
-        
-        print("DEBUG: Received response text: {}".format(resp_text))
-        print("DEBUG: Response took {} seconds.".format(time.time() - start_time))
         
         # Sanitize the response text to extract only the JSON component
         json_start = resp_text.find('{')
@@ -331,5 +327,8 @@ class BaseSpeechReceiverModule(ALModule):
                     if behaviour_triggered:
                         f.write('behaviour triggered,"'+behaviour_triggered.replace('"', '\\"')+'"\n')
                     f.close()
+
+            if not self.conversation_ongoing:
+                self.memory.raiseEvent("ResetConversation", True)
 
             self.memory.raiseEvent("Speaking", False)

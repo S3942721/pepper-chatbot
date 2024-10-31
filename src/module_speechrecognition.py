@@ -44,7 +44,7 @@ class SpeechRecognitionModule(ALModule):
     Your callback needs to be a method with two parameter (variable name, value).
     """
 
-    def __init__( self, strModuleName, strNaoIp, port, stt_url, stt_route='/speech/recognition', stt_api_key='no-key', volume = 0 ):
+    def __init__( self, strModuleName, strNaoIp, port, stt_url, stt_route='/speech/recognition', stt_api_key='no-key', volume = 50 ):
         try:
             ALModule.__init__(self, strModuleName )
 
@@ -130,8 +130,8 @@ class SpeechRecognitionModule(ALModule):
         audio.setClientPreferences( self.getName(),  SAMPLE_RATE, nNbrChannelFlag, nDeinterleave ) # setting same as default generate a bug !?!
         audio.subscribe( self.getName() )
 
-    def clear_all(self):
-        self.clear_buffer()
+    def clear_all(self, _, value):
+        self.clear_buffer(_)
         self.memory.raiseEvent("Listening", False)
 
     def pause(self):
@@ -141,7 +141,6 @@ class SpeechRecognitionModule(ALModule):
         self.isStarted = False
 
         audio = ALProxy("ALAudioDevice")
-        audio.setOutputVolume(0)
         audio.unsubscribe(self.getName())
 
         # print("INF: SpeechRecognitionModule: stopped!")
@@ -159,6 +158,15 @@ class SpeechRecognitionModule(ALModule):
         self.toggle_status()
 
     def recording_toggle(self, _, allowed_recording):
+        if allowed_recording:
+            audio = ALProxy( "ALAudioDevice")
+            audio.setOutputVolume(self.volume)
+            print("INF: SpeechRecognitionModule: volume set to %s" % self.volume)
+        else:
+            audio = ALProxy( "ALAudioDevice")
+            audio.setOutputVolume(0)
+            print("INF: SpeechRecognitionModule: volume set to 0")
+        
         self.is_allowed_recording = allowed_recording
         self.toggle_status()
         self.memory.raiseEvent("ResetConversation", True)

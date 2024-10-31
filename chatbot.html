@@ -116,6 +116,7 @@ div {
     width: 100%;
     height: 50%;
     color: gray;
+    background-color: white;
     position: relative;
     display: flex;
     align-items: center;
@@ -129,7 +130,7 @@ div {
     height: 30px;
 }
 
-#record-control.recording {
+#record-control.not-recording {
     background-color: red;
     color: white;
 }
@@ -151,7 +152,7 @@ div {
                     <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>
                 </svg>
             </div>
-            <div id="record-control" class="btn recording"></div>
+            <div id="record-control" class="btn"></div>
         </div>
         <div class="buttons right">
         </div>
@@ -253,15 +254,15 @@ QiSession(function(session) {
             stopped = !stopped;
             stopped && setLog("Recording paused");
             record_controller.innerHTML = stopped ? START_RECORD : PAUSE_RECORD;
-            record_controller.classList.toggle('recording', !stopped)
+            record_controller.classList.toggle('not-recording', stopped)
         }
 
-        ALMemory.subscriber("SpeechRecognition").then(function(subscriber) {
-            subscriber.signal.connect(function(value) {
-                wakeUp()
-                setLog('What I heard is: ' + value)
-            });
-        });
+        // ALMemory.subscriber("SpeechRecognition").then(function(subscriber) {
+        //     subscriber.signal.connect(function(value) {
+        //         wakeUp()
+        //         setLog('What I heard is: ' + value)
+        //     });
+        // });
         ALMemory.subscriber("UserMessage").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
                 wakeUp()

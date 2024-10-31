@@ -19,7 +19,7 @@ class BehaviourExecutor:
         Example:
             "^start(hey) Goodbye ^wait(hey)” will become "^start(animations/Stand/Gestures/Hey_4) Goodbye ^wait(animations/Stand/Gestures/Hey_4)"
         """
-        print("Sanitizing chat response: '{}'".format(chat_response))
+        # print("Sanitizing chat response: '{}'".format(chat_response))
         # Dictionary to store the mapping of keywords to selected behaviours
         keyword_to_behaviour = {}
         behaviour_triggered = [False]  # Use a list to allow modification in nested function
@@ -34,10 +34,10 @@ class BehaviourExecutor:
                 if behaviour:
                     selected_behaviour = random.choice(behaviour['behaviour_variations'])
                     keyword_to_behaviour[keyword] = selected_behaviour
-                    print("Keyword '{}' mapped to behaviour: {}".format(keyword, selected_behaviour))
+                    # print("Keyword '{}' mapped to behaviour: {}".format(keyword, selected_behaviour))
                     behaviour_triggered[0] = True
                 else:
-                    print("No behaviour found for keyword: '{}'".format(keyword))
+                    # print("No behaviour found for keyword: '{}'".format(keyword))
                     return match.group(0)  # Return the original match if no behaviour is found
             return "^{}({})".format(match.group(1), keyword_to_behaviour[keyword])
 
@@ -47,8 +47,8 @@ class BehaviourExecutor:
         # Remove behaviour actions to create spoken response
         spoken_response = re.sub(r'\^(start|wait|stop|run)\([^\)]*\)', '', chat_response).strip()
         
-        print("Sanitized chat response: '{}'".format(sanitized_response))
-        print("Spoken response: '{}'".format(spoken_response))
+        # print("Sanitized chat response: '{}'".format(sanitized_response))
+        # print("Spoken response: '{}'".format(spoken_response))
         return sanitized_response, behaviour_triggered[0], spoken_response
 
     def execute_behaviour(self, behaviour_key, nao_ip, nao_port):

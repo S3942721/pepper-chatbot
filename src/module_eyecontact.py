@@ -1,34 +1,44 @@
+import threading
 from naoqi import ALProxy, ALModule
 
 class EyeContactModule(ALModule):
     def __init__(self, name):
         ALModule.__init__(self, name)
-        self.BIND_PYTHON( self.getName(),"callback" )
+        self.BIND_PYTHON(self.getName(), "callback")
 
         self.face_detected = False
-        
         self.memory = ALProxy("ALMemory")
         self.memory.subscribeToEvent("FaceDetected", name, "on_face_detected")
-    
+        self.face_lost_timer = None
+        self.face_lost_timeout = 20  # Set your desired timeout in seconds
 
-    def __del__( self ):
-        print( "INF: EyeContactModule.__del__: cleaning everything" )
+    def __del__(self):
+        print("INF: EyeContactModule.__del__: cleaning everything")
         self.stop()
 
     def on_face_detected(self, event_name, value):
-        if value and not self.face_detected:
-            self.handle_status_change(True)
-        elif not value and self.face_detected:
-            self.handle_status_change(False)
+        if value:
+            if not self.face_detected:
+                print("Face detected")
+                self.handle_status_change(True)
+            if self.face_lost_timer:
+                self.face_lost_timer.cancel()
+                self.face_lost_timer = None
+        else:
+            if self.face_detected:
+                print("Face lost")
+                self.face_lost_timer = threading.Timer(self.face_lost_timeout, self.handle_status_change, [False])
+                self.face_lost_timer.start()
 
     def handle_status_change(self, status):
-        # print(status)
-        # if status:
-        #     self.speech.say("Hello, I'm pepper, how can I help you today?")
         self.face_detected = status
+        print("INF: EyeContactModule: Eye contact is", "ON" if status else "OFF")
         self.memory.raiseEvent('EyeContact', status)
-
+        if not self.face_detected:
+            self.memory.raiseEvent('ResetConversation', True)
 
     def stop(self):
         self.memory.unsubscribeToEvent("FaceDetected", self.getName())
-        print( "INF: EyeContactModule: stopped!" )
+        if self.face_lost_timer:
+            self.face_lost_timer.cancel()
+        print("INF: EyeContactModule: stopped!")
