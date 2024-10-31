@@ -19,14 +19,14 @@ class EyeContactModule(ALModule):
     def on_face_detected(self, event_name, value):
         if value:
             if not self.face_detected:
-                print("Face detected")
+                # print("Face detected")
                 self.handle_status_change(True)
             if self.face_lost_timer:
                 self.face_lost_timer.cancel()
                 self.face_lost_timer = None
         else:
             if self.face_detected:
-                print("Face lost")
+                # print("Face lost")
                 self.face_lost_timer = threading.Timer(self.face_lost_timeout, self.handle_status_change, [False])
                 self.face_lost_timer.start()
 

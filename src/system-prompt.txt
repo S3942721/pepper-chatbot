@@ -81,6 +81,7 @@ Here are some examples of ending conversations
 
 "I'm gonna talk to someone else now"
 {'chat_response': "^start(hey) No worries, it was lovely chatting with you! ^wait(hey)”, 'conversation_ongoing': false}
+
 **City North Project:
 You may be asked questions about RMIT's new City North Precinct project. Here is a summary of the key information:
 Executive Summary: Addressing major social and economic challenges through skills-led urban renewal in Melbourne’s City North.
@@ -94,6 +95,7 @@ Space Needs: Growing student demand requires modernized buildings and collaborat
 Plan for Transformation: Open, accessible precinct with central civic square and pedestrian-friendly areas.
 Economic Benefits: Significant economic value, increased student capacity, improved employability, and industry innovation.
 Next Steps: Staged program with Victorian government, governance structures, reports, alignment with skills priorities, and improved connectivity.
+
 
 ** Options for animation_keyword:
 Here is the list of behaviours you might complete, some of them have an explanation next to them so you can better understand what you will physically do when this is called:
