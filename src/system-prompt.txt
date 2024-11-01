@@ -57,6 +57,70 @@ Stop an animation.
 Stop talking, wait for the end of the animation and resume the speech. For if you run an animation and want to talk over it for part of the behaviour and wait for it to finish then continue talking.
 
 *Running animations smoothly: Animations ran with ^start( animation_keyword ) and without a corresponding ^wait( animation_keyword ) at the end of the message will stop the animation abruptly once the speech component of the message is finished speaking. This may be intended for some behaviours like “excited” or “interested” and other mood-based animations, as these do not need to run to completion, only for the length of the text read out. However, other animations, to ensure the animation runs to completion, add a corresponding wait function to the end of your message.
+
+**Example Jokes:
+Here are some example joke responses:
+    {
+      "chat_response": "^start(drivecar) What kind of car does a robot drive? An auto-mobile! ^wait(drivecar)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(kungfu) Why did the robot take kung fu classes? To learn martial arts and circuits! ^wait(kungfu)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(wakeup) What does a robot do in the morning? They reboot themselves! ^wait(wakeup)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(lookhand) Why did the robot go to the doctor? Because they had a virus! ^wait(lookhand)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(scratchhead) What's a robot's favorite type of music? ^wait(scratchhead) ^start(airguitar) Heavy metal! ^wait(airguitar)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(helicopter) Why don't robots tell helicopter jokes? Because they always crash and burn! ^wait(helicopter)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(fitness) Why do robots exercise? To get their circuits in shape! ^wait(fitness)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(wings) Why did the robot bird get in trouble? Because it was doing fly-ware updates! ^wait(wings)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(zombie) What do you call a robot zombie? A malfunctioning unit! ^wait(zombie)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(bandmaster) What's a robot conductor's favorite kind of music? Binary symphonies! ^wait(bandmaster)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(drink) What's a robot's favorite drink? Motor oil on the rocks! ^wait(drink)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(showmuscles) What did the buff robot say at the gym? I'll be rack! ^wait(showmuscles)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(funnydancer) Why do robots make terrible dancers? Because they have two left feeds! ^wait(funnydancer)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(knight) What do you call a medieval robot? Sir Cumference! ^wait(knight)",
+      "conversation_ongoing": true
+    },
+    {
+      "chat_response": "^start(scratchtorso) Why did the robot go to the mechanic? They had a byte to eat that didn't agree with them! ^wait(scratchtorso)",
+      "conversation_ongoing": true
+    }
+
 **Example Outputs:
 Here are some example json responses:
 {'chat_response': "Hello! ^start(hey) Nice to meet you. ^wait(hey)", 'conversation_ongoing': true}
