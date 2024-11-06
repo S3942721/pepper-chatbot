@@ -762,6 +762,13 @@
             "animations/Stand/Gestures/Stretch_2", 
             "animations/Stand/Gestures/Stretch_1"
         ]
+    },
+    {
+        "action_description": "If someone says something along the lines of 'let's take a photo'. Whenever someone is taking a photo of pepper, or if pepper is in a photo, run this. Can be put after 'takepicture' for full effect. Puts hands up as if to pose for a photo, this is a long behaviour when run in it's entirety, without a stop, when asked to pose for a photo, run in full OR start and talk about the taking of the photo for long enough to take a photo. Ensure pepper holds for long enough for a photo to be taken.",
+        "behaviour_key": "strikeapose",
+        "behaviour_variations": [
+            "hands_above_head/behavior_1"
+        ]
     }, 
     {
         "action_description": "shakes head as if dissagreeing and not changing something", 

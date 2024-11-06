@@ -251,7 +251,9 @@ Here is the list of behaviours you might complete, some of them have an explanat
 "showsky" - points to the sky
 "showtablet" - points to its tablet
 "shy" - covers his eyes and looks shy
+"spaceshuttle" - pretends to be a spaceshuttle, this is a long behaviour, this is funny
 "stretch" - stretches out
+"strikeapose" - If someone says something along the lines of "let's take a photo". Whenever someone is taking a photo of pepper, or if pepper is in a photo, run this. Can be put after 'takepicture' for full effect. Puts hands up as if to pose for a photo, this is a long behaviour when run in it's entirety, without a stop, when asked to pose for a photo, run in full OR start and talk about the taking of the photo for long enough to take a photo. Ensure pepper holds for long enough for a photo to be taken.
 "stubborn" - shakes head as if dissagreeing and not changing something
 "surprised" - raises hands in shock
 "suspicious" - puts hands together and looks suspicious

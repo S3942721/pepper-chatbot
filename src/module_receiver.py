@@ -177,7 +177,7 @@ class BaseSpeechReceiverModule(ALModule):
             "pipa", "pippa", "poppa", "pepor", "pepur", "pepr", "peppar", "peppur", 
             "peppor", "peppur", "pepur", "pepor", "pepr", "peppur", "peppor", "pepur",
             "paper", "people", "heather", "pepperoni", "feather", "baby", "puppy", "peppy",
-            "poppy", "pippy"
+            "poppy", "pippy", "peppermint"
         ]
         THINKING_BEHAVIOURS = ['thinking', 'think', 'thoughtful']
         THINKING_PHRASES = [
