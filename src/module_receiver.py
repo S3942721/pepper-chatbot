@@ -156,10 +156,10 @@ class BaseSpeechReceiverModule(ALModule):
             # listening_message = "^start({})^wait({})".format(random_behaviour, random_behaviour)
             # listening_message, _, _ = executor.sanitize_behaviour_requests(listening_message)
             # speech.say(listening_message)
-            time.sleep(3)
+            time.sleep(1)
         
         # Set the LEDs to white
-        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
+        # self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
 
     def processRemote(self, signalName, message):
         print("DEBUG: Received message: {}".format(message))
@@ -261,7 +261,7 @@ class BaseSpeechReceiverModule(ALModule):
             behaviour_thread.join()
         
         # Set the LEDs to white
-        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
+        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
         
         # Sanitize the response text to extract only the JSON component
         json_start = resp_text.find('{')
@@ -312,7 +312,7 @@ class BaseSpeechReceiverModule(ALModule):
  
             print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
             self.memory.raiseEvent("PepperMessage", spoken_response)
-            # self.memory.raiseEvent("Speaking", True)
+            self.memory.raiseEvent("RunningBehaviour", True)
             self.speech.say(resp_message)
             # self.memory.raiseEvent("Speaking", False)
             if(len(self.messages_to_llm) > 1):

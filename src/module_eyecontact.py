@@ -9,8 +9,9 @@ class EyeContactModule(ALModule):
         self.face_detected = False
         self.memory = ALProxy("ALMemory")
         self.memory.subscribeToEvent("FaceDetected", name, "on_face_detected")
+        self.memory.subscribeToEvent("RunningBehaviour", name, "on_face_detected")
         self.face_lost_timer = None
-        self.face_lost_timeout = 20  # Set your desired timeout in seconds
+        self.face_lost_timeout = 30
 
     def __del__(self):
         print("INF: EyeContactModule.__del__: cleaning everything")
@@ -35,6 +36,7 @@ class EyeContactModule(ALModule):
         print("INF: EyeContactModule: Eye contact is", "ON" if status else "OFF")
         self.memory.raiseEvent('EyeContact', status)
         if not self.face_detected:
+            print("INF: EyeContactModule: Resetting conversation")
             self.memory.raiseEvent('ResetConversation', True)
 
     def stop(self):

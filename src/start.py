@@ -163,6 +163,7 @@ def main():
     memory.declareEvent("Listening")
     memory.declareEvent("UserMessage")
     memory.declareEvent("EyeContact")
+    memory.declareEvent("RunningBehaviour")
     memory.declareEvent("ResetConversation")
     memory.declareEvent("HealthyCheck")
     memory.declareEvent("ControlRecording")
