@@ -182,8 +182,8 @@ class BaseSpeechReceiverModule(ALModule):
         THINKING_BEHAVIOURS = ['thinking', 'think', 'thoughtful']
         THINKING_PHRASES = [
             "hmm one moment", "thinking", "let's see", "one sec", "just a sec", "let me think", 
-            "hmm... one sec", "one moment", "just thinking", "give me sec", 
-            "just thinking...", "just a moment",
+            "hmm... one sec", "one moment", "just thinking", "give me a sec", 
+            "just thinking...", "just a moment", "sorry, one sec",
             "processing that", "hmmm just a sec", "hmm let's see", "just a second", 
             "just processing", "thinking now", "thinking about that"
         ]
