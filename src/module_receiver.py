@@ -49,6 +49,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.save_csv = save_csv
         
         self.conversation_ongoing = False
+        self.disable_thinking = False
 
         if self.save_csv:
             with open('dialogue.csv', 'w') as f:
@@ -177,7 +178,7 @@ class BaseSpeechReceiverModule(ALModule):
             "pipa", "pippa", "poppa", "pepor", "pepur", "pepr", "peppar", "peppur", 
             "peppor", "peppur", "pepur", "pepor", "pepr", "peppur", "peppor", "pepur",
             "paper", "people", "heather", "pepperoni", "feather", "baby", "puppy", "peppy",
-            "poppy", "pippy", "peppermint"
+            "poppy", "pippy", "peppermint", "debra"
         ]
         THINKING_BEHAVIOURS = ['thinking', 'think', 'thoughtful']
         THINKING_PHRASES = [
@@ -228,13 +229,14 @@ class BaseSpeechReceiverModule(ALModule):
         self.messages_to_llm.append(user_msg)
         self.sync_messages()
 
-        # Set the LEDs to blue
-        self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
-        behaviour_thread = threading.Thread(target=think_about_response, args=(self.executor, self.speech))
-        behaviour_thread.start()
+        if not self.disable_thinking:
+            # Set the LEDs to blue
+            self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
+            behaviour_thread = threading.Thread(target=think_about_response, args=(self.executor, self.speech))
+            behaviour_thread.start()
 
-        eyes_thread = threading.Thread(target=eyes_thinking_about_response)
-        eyes_thread.start()
+            eyes_thread = threading.Thread(target=eyes_thinking_about_response)
+            eyes_thread.start()
 
         start_time = time.time()
         print("DEBUG: Sending message to chatbot server")
