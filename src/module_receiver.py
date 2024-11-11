@@ -49,7 +49,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.save_csv = save_csv
         
         self.conversation_ongoing = False
-        self.disable_thinking = False
+        self.disable_thinking = True
 
         if self.save_csv:
             with open('dialogue.csv', 'w') as f:
@@ -253,14 +253,15 @@ class BaseSpeechReceiverModule(ALModule):
         print("DEBUG: Response took {} seconds.".format(time.time() - start_time))
         print("DEBUG: Received response text: {}".format(resp_text))
         
-        # Stop eyes thread
-        eyes_thread.join()
-        print("After eyes_thread.join()")
+        if not self.disable_thinking:
+            # Stop eyes thread
+            eyes_thread.join()
+            print("After eyes_thread.join()")
         
-        # Forcibly stop behaviour thread
-        if behaviour_thread.is_alive():
-            self.stop_listening_thread.set()
-            behaviour_thread.join()
+            # Forcibly stop behaviour thread
+            if behaviour_thread.is_alive():
+                self.stop_listening_thread.set()
+                behaviour_thread.join()
         
         # Set the LEDs to white
         self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
