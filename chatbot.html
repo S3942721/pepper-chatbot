@@ -312,7 +312,7 @@ QiSession(function(session) {
                     speakingCallback(speaking);
                 }
                 if(!allowed_recording) {
-                    stopped = false
+                    stopped = true
                     handleStopping(false)
                 }
                 if(history) {
