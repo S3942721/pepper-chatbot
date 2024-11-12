@@ -35,126 +35,73 @@ div {
     display: none !important;
 }
 
-.logs-main {
-    position: absolute;
-    left: 10%;
-    top: 0;
+div {
+    box-sizing: border-box;
+}
+
+.function-btn {
+    width: 200px;
     height: 100%;
-    width: 80%;
-    border-left: 1px solid gray;
-    border-right: 1px solid gray;
-}
-
-#conversation {
-    width: 100%;
-    height: 70%;
-    position: absolute;
-    top: 0;
-    padding: 10px;
-    overflow-y: auto;
-}
-
-#conversation > .greeting {
-    width: 100%;
-    height: fit-content;
-    margin-top: 20%;
-    text-align: center;
-    color: gray;
-    font-size: 35px;
-}
-
-#conversation > .bubble {
-    position: relative;
-    max-width: 100%;
-    margin: auto;
-    margin-top: 20px;
-    font-size: 23px;
-    width: fit-content;
-    word-wrap: break-word;
-}
-
-#conversation > .bubble.user {
-    margin-right: 0;
-}
-
-#conversation > .bubble.assistant {
-    margin-left: 0;
-    padding: 20px;
-    border-radius: 15px;
-    background-color: rgba(230, 230, 230, 0.6);
-}
-
-#logs {
-    width: 100%;
-    position: absolute;
-    bottom: 0;
-    height: 30%;
     display: flex;
     align-items: center;
-    background-color: rgba(220, 220, 220, 0.6);
-    padding: 20px;
-    font-size: 22px;
-    word-wrap: break-word;
-    overflow: hidden;
-}
-
-.buttons {
-    width: 10%;
     position: absolute;
-    top: 0;
-    height: 100%;
-}
-.buttons.left {
     left: 0;
+    top: 0;
 }
 
-.buttons.right {
+.function-btn.right {
+    left: unset;
     right: 0;
 }
 
-.buttons > .btn {
-    width: 100%;
-    height: 50%;
-    color: gray;
-    background-color: white;
-    position: relative;
-    display: flex;
-    align-items: center;
-    border-bottom: 1px solid gray;
-}
-
-.buttons > .btn > svg {
-    display: block;
-    margin: auto;
-    width: 30px;
-    height: 30px;
-}
-
-#record-control.not-recording {
+#pause-restart.not-recording {
     background-color: red;
     color: white;
+}
+
+#photo {
+    width: calc(100vw - 400px);
+    height: calc(100vh - 230px);
+    position: absolute;
+    left: 200px;
+    top: 0;
+    display: flex;
+    align-items: center;
+}
+
+#photo > img {
+    height: 100%;
+    max-width: 100%;
+    margin: auto;
+}
+
+#indicator {
+    width: calc(100vw - 400px);
+    height: 230px;
+    position: absolute;
+    bottom: 0;
+    left: 200px;
+    background-color: white;
+}
+
+#indicator.listening {
+    background-color: lightgray;
 }
     </style>
     <script src="http://198.18.0.1/libs/qimessaging/2/qimessaging.js"></script>
 </head>
 <body>
     <div id='main' class="idle">
-        <div class="logs-main">
-            <div id="conversation">
-                <div class="greeting">Hello, I'm pepper, how can I help you today?</div>
-            </div>
-            <div id="logs">Please wait a second, I'm still not prepared...</div>
+        <div id="pause-restart" class="function-btn"></div>
+        <div id="photo"></div>
+        <div id="indicator">
+            <img src="http://198.18.0.1/apps/rmit-race/racehub_horizontal.png" alt="RACE HUB" />
         </div>
-        <div class="buttons left">
-            <div id="reset" class="btn">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/>
-                    <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>
-                </svg>
-            </div>
-            <div id="record-control" class="btn"></div>
-        </div>
-        <div class="buttons right">
+        <div id="reset" class="function-btn right">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>
+            </svg>
         </div>
     </div>
 </body>
@@ -190,94 +137,33 @@ function wakeUp() {
 document.ontouchstart = wakeUp;
 document.onmousedown = wakeUp;
 
-const conversation = document.getElementById('conversation');
+const record_controller = document.getElementById('pause-restart');
+const reset_controller = document.getElementById("reset");
+const listening_indicator = document.getElementById("indicator");
+const photo = document.getElementById("photo")
 
-function scroll() {
-    const distance = conversation.scrollHeight - conversation.scrollTop;
-    const duration = 300;
-    var start = Date.now();
-    const mustEnd = start + duration;
-    function update() {
-        const end = Date.now()
-        if(end <= mustEnd) {
-            conversation.scrollTop += ((end - start) / duration) * distance;
-            requestAnimationFrame(update)
-        }
-    }
-    requestAnimationFrame(update)
-}
-
-function addBubble(role, content, no_scroll) {
-    if(!conversation_started) {
-        conversation.textContent = '';
-        conversation_started = true;
-    }
-    const bubble = document.createElement('div')
-    bubble.className = 'bubble '+role;
-    bubble.textContent = content;
-    conversation.appendChild(bubble);
-    !no_scroll && scroll();
-}
-
-const reset_btn = document.getElementById('reset');
-const logs = document.getElementById('logs')
-
-var log_timeout;
-
-function setLog(content) {
-    log_timeout && clearTimeout(log_timeout);
-    if(content.indexOf("[THINK_RESP]") === 0) {
-        logs.textContent = content.substring(12);
-        log_timeout = setTimeout(function(){
-            logs.textContent = "Hmm that's a little bit hard, please wait while I'm still thinking..."
-        }, 4000);
-    } else {
-        logs.textContent = content;
-    }
-}
-
-const record_controller = document.getElementById('record-control');
 record_controller.innerHTML = PAUSE_RECORD;
 var stopped = false;
 
 QiSession(function(session) {
     session.service("ALMemory").then(function(ALMemory) {
-
-        function speakingCallback(value) {
-            wakeUp()
-            value && addBubble('assistant', value, false)
-            setLog("Here's my answer")
-        }
-
         function handleStopping(send_event) {
             send_event && ALMemory.raiseEvent("ControlRecording", stopped);
             stopped = !stopped;
-            stopped && setLog("Recording paused");
             record_controller.innerHTML = stopped ? START_RECORD : PAUSE_RECORD;
             record_controller.classList.toggle('not-recording', stopped)
         }
 
-        // ALMemory.subscriber("SpeechRecognition").then(function(subscriber) {
-        //     subscriber.signal.connect(function(value) {
-        //         wakeUp()
-        //         setLog('What I heard is: ' + value)
-        //     });
-        // });
         ALMemory.subscriber("UserMessage").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
                 wakeUp()
-                addBubble('user', value, false)
-            });
-        });
-        ALMemory.subscriber("Log").then(function(subscriber) {
-            subscriber.signal.connect(function(value) {
-                wakeUp()
-                setLog(value.substring(0))
             });
         });
         ALMemory.subscriber("PepperMessage").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
-                speakingCallback(value)
+                if(value && /danny.*liu/i.test(value)) {
+                    photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/Danny_Liu.jpg' alt='Danny Liu'>"
+                }
             });
         });
         ALMemory.subscriber("EyeContact").then(function(subscriber) {
@@ -289,45 +175,34 @@ QiSession(function(session) {
                 }
             });
         });
-        ALMemory.subscriber("ResetConversation").then(function(subscriber) {
-            subscriber.signal.connect(function(value) {
-                conversation.innerHTML = "<div class=\"greeting\">Hello, I'm pepper, how can I help you today?</div>"
-                conversation_started = false
-            });
-        });
         ALMemory.subscriber("HealthyCheck").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
                 value === "ping" &&
                 ALMemory.raiseEvent("HealthyCheck", "pong")
             });
         });
+        ALMemory.subscriber("Listening").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                const is_listening = !!value;
+                listening_indicator.classList.toggle('listening', is_listening);
+                if(is_listening) photo.textContent = '';
+            });
+        });
         ALMemory.subscriber("Sync").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
-                const values = JSON.parse(value);
-                const speaking = values.speaking
                 const allowed_recording = values.allowed_recording
-                const history = values.history
-
-                if(speaking) {
-                    speakingCallback(speaking);
-                }
+            
                 if(!allowed_recording) {
                     stopped = true
                     handleStopping(false)
                 }
-                if(history) {
-                    const history_arr = JSON.parse(history)
-                    conversation_started = false;
-                    for(var i = 0; i < history_arr.length; i++) {
-                        addBubble(history_arr[i].role, history_arr[i].content, true);
-                    }
-                    scroll()
-                }
             });
         });
-        reset_btn.onclick = function() {ALMemory.raiseEvent("ResetConversation", true)}
         record_controller.onclick = function() { handleStopping(true) }
+        reset_controller.onclick = function() { ALMemory.raiseEvent("ResetConversation", true); }
     }, function(error) {});
 }, function() {});
 </script>
 </html>
+
+<!-- h: 585 / w: 946 -->
