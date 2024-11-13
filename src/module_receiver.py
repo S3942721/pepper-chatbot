@@ -316,6 +316,7 @@ class BaseSpeechReceiverModule(ALModule):
             print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
             self.memory.raiseEvent("PepperMessage", spoken_response)
             self.memory.raiseEvent("RunningBehaviour", True)
+            self.memory.raiseEvent("Speaking", True)
             self.speech.say(resp_message)
             # self.memory.raiseEvent("Speaking", False)
             if(len(self.messages_to_llm) > 1):
