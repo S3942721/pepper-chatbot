@@ -49,7 +49,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.save_csv = save_csv
         
         self.conversation_ongoing = False
-        self.disable_thinking = True
+        self.disable_thinking = False
 
         if self.save_csv:
             with open('dialogue.csv', 'w') as f:
