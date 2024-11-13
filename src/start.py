@@ -151,7 +151,7 @@ def main():
     
     aba = ALProxy("ALBasicAwareness")
     aba.setEnabled(True)
-    aba.setEngagementMode("FullyEngaged") # Unengaged, FullyEngaged, SemiEngaged TODO: tweak this
+    aba.setEngagementMode("SemiEngaged") # Unengaged, FullyEngaged, SemiEngaged TODO: tweak this
     aba.setTrackingMode("MoveContextually") # Head, WholeBody, MoveContextually, BodyRotation TODO: tweak this
     
     # declear events sharing between different modules

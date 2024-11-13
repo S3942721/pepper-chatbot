@@ -30,6 +30,8 @@ class ExploringModule(ALModule):
         # Subscribe to the events
         self.memory.subscribeToEvent("ResetConversation", self.getName(), "handle_reset_conversation")
         self.memory.subscribeToEvent("EyeContact", self.getName(), "on_eye_contact_changed")
+        self.memory.subscribeToEvent("ALBasicAwareness/HumanTracked", self.getName(), "on_human_tracked")
+        self.memory.subscribeToEvent("ALBasicAwareness/HumanLost", self.getName(), "on_human_tracked")
 
         print("INF: ExploringModule: initialized with name:", name)
 
@@ -43,12 +45,22 @@ class ExploringModule(ALModule):
         if value:
             self.start()
 
+    def on_human_tracked(self, event_name, tracked_person_id):
+        print("INF: ExploringModule: on_human_tracked called with value:", tracked_person_id)
+        if tracked_person_id != -1 and tracked_person_id is not None and tracked_person_id is not True:
+            self.current_person = tracked_person_id
+            # if self.exploring:
+            #     self.stop()
+        else:
+            self.current_person = None
+
     def on_eye_contact_changed(self, event_name, value):
         print("INF: ExploringModule: on_eye_contact_changed called with value:", value)
         if value:
             if not self.eye_contact:
                 self.eye_contact = True
                 self.stop()
+                self.start_tracking()
             if self.eye_contact_lost_timer:
                 self.eye_contact_lost_timer.cancel()
                 self.eye_contact_lost_timer = None
@@ -62,6 +74,28 @@ class ExploringModule(ALModule):
         print("INF: ExploringModule: eye_contact lost for 5 seconds, starting exploration")
         self.start()
 
+    def start_tracking(self):
+        if not self.current_person:
+            print("INF: ExploringModule: no person to track")
+            return
+
+        # Add target to track.
+        print("INF: ExploringModule: Tracking person with ID:", self.current_person)
+        targetName = "Person"
+        self.tracker_service.registerTarget(targetName, self.current_person)
+
+        # set mode
+        mode = "Move"
+        self.tracker_service.setMode(mode)
+
+        # Then, start tracker.
+        self.tracker_service.track(targetName)
+
+    def stop_tracking(self):
+        # Stop tracker.
+        self.tracker_service.stopTracker()
+        self.tracker_service.unregisterAllTargets()
+
     def start(self):
         print("INF: ExploringModule: start called")
         # Run the exploration asynchronously
@@ -73,6 +107,8 @@ class ExploringModule(ALModule):
 
         def explore():
             fut = qi.async(exploration_task, self)
+
+        self.stop_tracking()
 
         print("INF: ExploringModule: starting exploration")
         explore()
