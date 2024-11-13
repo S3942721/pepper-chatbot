@@ -1,7 +1,7 @@
 from module_receiver import BaseSpeechReceiverModule
 from module_speechrecognition import SpeechRecognitionModule
 from module_eyecontact import EyeContactModule
-from module_tracker import TrackingModule
+from module_exploring import ExploringModule
 from module_healthy_check import HealthyCheckModule
 from naoqi import ALProxy, ALBroker
 
@@ -170,6 +170,7 @@ def main():
     memory.declareEvent("ControlRecording")
     memory.declareEvent("Sync")
     memory.declareEvent("SyncMessages")
+    memory.declareEvent("Exploring")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
@@ -187,8 +188,9 @@ def main():
     global EyeContact
     EyeContact = EyeContactModule("EyeContact")
     
-    global Tracking
-    Tracking = TrackingModule("Tracking")
+    global Exploring
+    Exploring = ExploringModule("Exploring")
+    Exploring.start()
 
     # auto-detection
     SpeechRecognition.setHoldTime(tofloat(os.getenv('HOLD_TIME')) or 2.0)
