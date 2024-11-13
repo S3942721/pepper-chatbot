@@ -164,22 +164,6 @@ const photo = document.getElementById("photo")
 record_controller.innerHTML = PAUSE_RECORD;
 var stopped = false;
 
-var listening_timeout;
-
-function onListeningChange() {
-    listening_indicator.classList.remove('listening');
-}
-
-function listeningDebounce(is_listening) {
-    listening_timeout && clearTimeout(listening_timeout);
-    if(is_listening) {
-        listening_indicator.classList.add('listening')
-        if(is_listening) photo.textContent = '';
-    } else {
-        listening_timeout = setTimeout(onListeningChange, 300);
-    }
-}
-
 QiSession(function(session) {
     session.service("ALMemory").then(function(ALMemory) {
         function handleStopping(send_event) {
@@ -218,12 +202,15 @@ QiSession(function(session) {
         });
         ALMemory.subscriber("Listening").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
-                listeningDebounce(!!value);
+                if(value) {
+                    listening_indicator.classList.add('listening')
+                    photo.textContent = '';
+                }
             });
         });
         ALMemory.subscriber("Speaking").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
-                listeningDebounce(false);
+                listening_indicator.classList.remove('listening')
             });
         });
         ALMemory.subscriber("Sync").then(function(subscriber) {
