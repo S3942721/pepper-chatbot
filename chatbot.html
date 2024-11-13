@@ -171,6 +171,7 @@ QiSession(function(session) {
             stopped = !stopped;
             record_controller.innerHTML = stopped ? START_RECORD : PAUSE_RECORD;
             record_controller.classList.toggle('not-recording', stopped)
+            stopped && listening_indicator.classList.remove('listening');
         }
 
         ALMemory.subscriber("UserMessage").then(function(subscriber) {
