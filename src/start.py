@@ -1,6 +1,7 @@
 from module_receiver import BaseSpeechReceiverModule
 from module_speechrecognition import SpeechRecognitionModule
 from module_eyecontact import EyeContactModule
+from module_tracker import TrackingModule
 from module_healthy_check import HealthyCheckModule
 from naoqi import ALProxy, ALBroker
 
@@ -185,6 +186,9 @@ def main():
 
     global EyeContact
     EyeContact = EyeContactModule("EyeContact")
+    
+    global Tracking
+    Tracking = TrackingModule("Tracking")
 
     # auto-detection
     SpeechRecognition.setHoldTime(tofloat(os.getenv('HOLD_TIME')) or 2.0)

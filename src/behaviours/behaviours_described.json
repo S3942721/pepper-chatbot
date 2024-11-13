@@ -223,7 +223,7 @@
         ]
     }, 
     {
-        "action_description": "claps and loos excited", 
+        "action_description": "claps and looks excited", 
         "behaviour_key": "excited", 
         "behaviour_variations": [
             "animations/Stand/Emotions/Positive/Excited_3", 
@@ -232,7 +232,7 @@
             "animations/Stand/Gestures/Excited_1", 
             "animations/Stand/Emotions/Positive/Excited_1"
         ]
-    }, 
+    },
     {
         "action_description": "gestures confused and wants an explanation", 
         "behaviour_key": "explain", 

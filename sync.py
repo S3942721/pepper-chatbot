@@ -12,6 +12,8 @@ HTML_REMOTE_PATH = "~/.local/share/PackageManager/apps/rmit-race/html/chatbot.ht
 PASSWORD_FILE = ".pepper_password"
 REMOTE_JSON_FILE = "pepperchat/behaviours/behaviours_described.json"
 LOCAL_JSON_FILE = os.path.join(LOCAL_FOLDER, "robot_behaviours_described.json")
+REMOTE_EXPLORER_FOLDER = "~/.local/share/Explorer"
+LOCAL_EXPLORER_FOLDER = os.path.join(os.path.dirname(LOCAL_FOLDER), "explorer")
 
 def run_command(command):
     """Run a shell command and print it."""
@@ -23,22 +25,46 @@ def run_command(command):
     print(result.stdout)
 
 def sync_files(remote_ip):
-    # Copy the behaviours_described.json file from the remote system to the local system
-    json_copy_command = f"sshpass -f {PASSWORD_FILE} scp {REMOTE_USER}@{remote_ip}:{REMOTE_JSON_FILE} {LOCAL_JSON_FILE}"
-    run_command(json_copy_command)
-    
-    """Sync local files to the remote system."""
-    # Remove the existing folder on the remote system
-    remove_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'rm -rf {REMOTE_FOLDER}'"
-    run_command(remove_command)
+    try:
+        # Copy the behaviours_described.json file from the remote system to the local system
+        check_file_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'test -f {REMOTE_JSON_FILE}'"
+        result = subprocess.run(check_file_command, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            json_copy_command = f"sshpass -f {PASSWORD_FILE} scp {REMOTE_USER}@{remote_ip}:{REMOTE_JSON_FILE} {LOCAL_JSON_FILE}"
+            run_command(json_copy_command)
+        else:
+            print(f"Warning: {REMOTE_JSON_FILE} does not exist on the remote system.")
+    except Exception as e:
+        print(f"Failed to copy JSON file: {e}")
 
-    # Copy the local folder to the remote system
-    copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_FOLDER}"
-    run_command(copy_command)
+    try:
+        """Sync local files to the remote system."""
+        # Remove the existing folder on the remote system
+        remove_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'rm -rf {REMOTE_FOLDER}'"
+        run_command(remove_command)
+    except Exception as e:
+        print(f"Failed to remove remote folder: {e}")
 
-    # Copy the chatbot.html file to the remote system
-    html_copy_command = f"sshpass -f {PASSWORD_FILE} scp {HTML_FILE} {REMOTE_USER}@{remote_ip}:{HTML_REMOTE_PATH}"
-    run_command(html_copy_command)
+    try:
+        # Copy the local folder to the remote system
+        copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_FOLDER}"
+        run_command(copy_command)
+    except Exception as e:
+        print(f"Failed to copy local folder to remote system: {e}")
+
+    try:
+        # Copy the chatbot.html file to the remote system
+        html_copy_command = f"sshpass -f {PASSWORD_FILE} scp {HTML_FILE} {REMOTE_USER}@{remote_ip}:{HTML_REMOTE_PATH}"
+        run_command(html_copy_command)
+    except Exception as e:
+        print(f"Failed to copy HTML file: {e}")
+
+    try:
+        # Copy the contents of the remote Explorer folder to the local explorer folder
+        explorer_copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {REMOTE_USER}@{remote_ip}:{REMOTE_EXPLORER_FOLDER}/. {LOCAL_EXPLORER_FOLDER}"
+        run_command(explorer_copy_command)
+    except Exception as e:
+        print(f"Failed to copy Explorer folder: {e}")
 
 def main():
     """Main function to handle command line arguments and initiate file sync."""
