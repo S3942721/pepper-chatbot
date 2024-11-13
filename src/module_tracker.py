@@ -38,38 +38,24 @@ class TrackingModule(ALModule):
         
         # Run the exploration asynchronously
         print("INF: TrackingModule: exploring environment")
-        radius = 6.0
         # self.exploration_promise = qi.Promise()
         # self.exploration_future = self.exploration_promise.future()
         
-        def exploration_task(self, promise):
-            future = self.navigation_service.explore(radius)
-            if promise.isCancelRequested():
-                print("INF: TrackingModule: exploration cancel requested")
-                self.navigation_service.stopExploration()
-                promise.setCanceled()
-            else:
-                promise.setValue(None)
+        def exploration_task(self):
+            radius = 25.0
+            self.navigation_service.explore(radius)
 
         def explore():
-            promise = qi.Promise()
-            qi.async(partial(self.exploration_task, promise))
-            return promise.future()
+            qi.async(exploration_task, self)
 
+        print("INF: TrackingModule: starting exploration")
         fut = explore()
-        
-        
-        print("INF: TrackingModule: Exploration started")
-        time.sleep(5)
-        
-        print("INF: TrackingModule: stopping exploring environment")
-        # self.navigation_service.stopExploration()
-        action.cancel()
-        
-        if action.isCanceled():
-            print("Action was canceled as expected")
+        print("INF: TrackingModule: exploration started")
 
-        self.exploration_future.cancel()
+        time.sleep(5)
+        self.navigation_service.stopExploration()
+        print("INF: TrackingModule: stopping exploring environment")
+
 
     def __del__(self):
         print("INF: TrackingModule.__del__: cleaning everything")
