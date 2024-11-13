@@ -275,6 +275,9 @@ class BaseSpeechReceiverModule(ALModule):
             self.memory.raiseEvent("Speaking", False)
             return
         
+        # Sanitize the response to text replace any non ascii characters with ascii equivalents
+        resp_text = resp_text.encode('ascii', 'ignore').decode('ascii')
+        
         if resp_text:
             # Decode the message JSON format, example: {'chat_response': 'Hey, how are you?', 'behaviour_request': 'hey', 'behaviour_order': 'before'}
             # Only decode the message if it is in the correct JSON format
@@ -311,7 +314,7 @@ class BaseSpeechReceiverModule(ALModule):
             
             # Clear speech recognition buffer
             self.memory.raiseEvent("ClearSpeechRecognitionBuffer", None)
- 
+
             print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
             self.memory.raiseEvent("PepperMessage", spoken_response)
             self.memory.raiseEvent("RunningBehaviour", True)
