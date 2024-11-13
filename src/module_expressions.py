@@ -39,7 +39,13 @@ class BehaviourExecutor:
                 else:
                     # print("No behaviour found for keyword: '{}'".format(keyword))
                     return match.group(0)  # Return the original match if no behaviour is found
-            return "^{}({})".format(match.group(1), keyword_to_behaviour[keyword])
+
+            pause_duration = 10000  # Define the pause duration of the strikeapose behaviour
+            if keyword == "strikeapose":
+                return "^start({}) \\pau={}\\ ^stop({})".format(keyword_to_behaviour[keyword], pause_duration, keyword_to_behaviour[keyword])
+            else:
+                return "^{}({})".format(match.group(1), keyword_to_behaviour[keyword])
+
 
         # Replace all occurrences of the keywords in the chat response
         sanitized_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, chat_response)
