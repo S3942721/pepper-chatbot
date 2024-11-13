@@ -46,6 +46,7 @@ class HealthyCheckModule(ALModule):
 
     def update_recording(self, event_name, value):
         self.is_allowed_recording = value
+        if not value: self.memory.raiseEvent("Listening", False)
 
     def update_speaking(self, event_name, value):
         self.is_speaking = value
