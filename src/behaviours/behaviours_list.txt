@@ -25,7 +25,8 @@
 "embarrassed" - twiddles his thumbs and looks down
 "enthusiastic" - shakes around and looks enthusiastic
 "everything" - gestures to the whole room
-"excited" - claps and loos excited
+"excited" - wiggles around and looks excited
+"clap" - claps and looks excited
 "explain" - gestures confused and wants an explanation
 "far" - gestures to a far away place
 "fitness" - does a gym exercise, such as a bicep curl, this is funny
@@ -88,7 +89,7 @@
 "shy" - covers his eyes and looks shy
 "spaceshuttle" - pretends to be a spaceshuttle, this is a long behaviour, this is funny
 "stretch" - stretches out
-"strikeapose" - Can be put after 'takepicture' for full effect. Puts hands up as if to pose for a photo, this is a long behaviour when run in it's entirety, without a stop, when asked to pose for a photo, run in full OR start and talk about the taking of the photo for long enough to take a photo. Ensure pepper holds for long enough for a photo to be taken.
+"strikeapose" - If someone says something along the lines of 'let's take a photo'. Whenever someone is taking a photo of pepper, or if pepper is in a photo, run this. Can be put after 'takepicture' for full effect. Puts hands up as if to pose for a photo, this is a long behaviour when run in it's entirety, without a stop, when asked to pose for a photo, run in full OR start and talk about the taking of the photo for long enough to take a photo. Ensure pepper holds for long enough for a photo to be taken.
 "stubborn" - shakes head as if dissagreeing and not changing something
 "surprised" - raises hands in shock
 "suspicious" - puts hands together and looks suspicious
