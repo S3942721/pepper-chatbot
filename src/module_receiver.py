@@ -47,9 +47,9 @@ class BaseSpeechReceiverModule(ALModule):
         self.reset_message()
 
         self.save_csv = save_csv
-        
+
         self.conversation_ongoing = False
-        self.disable_thinking = False
+        self.DISABLE_THINKING = False
 
         if self.save_csv:
             with open('dialogue.csv', 'w') as f:
@@ -58,9 +58,9 @@ class BaseSpeechReceiverModule(ALModule):
 
         print("DEBUG: Initializing BehaviourExecutor with behaviour_file: {}".format(self.behaviour_file))
         self.executor = BehaviourExecutor(self.behaviour_file)
-        
+
         TESTING_BEHAVIOURS = False
-        
+
         if TESTING_BEHAVIOURS:
             index = 0
             previous_description = "<NO DESCRIPTION>"
@@ -98,6 +98,7 @@ class BaseSpeechReceiverModule(ALModule):
     def clear_all(self, _, value):
         self.reset_message()
         self.conversation_ongoing = False
+        self.memory.raiseEvent("ConversationOngoing", False)
 
     def reset_message(self):
         self.messages_to_llm = [{
@@ -109,6 +110,7 @@ class BaseSpeechReceiverModule(ALModule):
 
     def start( self ):
         self.memory.subscribeToEvent("SpeechRecognition", self.getName(), "processRemote")
+        self.memory.subscribeToEvent("Say", self.getName(), "processRemote")
         # print( "INF: ReceiverModule: started!" )
 
 
@@ -163,6 +165,7 @@ class BaseSpeechReceiverModule(ALModule):
         # self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
 
     def processRemote(self, signalName, message):
+        print("DEBUG: Received from: {}".format(signalName))
         print("DEBUG: Received message: {}".format(message))
         # While we process the message, we should stop the speech recognition
         self.memory.raiseEvent("Speaking", True)
@@ -229,7 +232,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.messages_to_llm.append(user_msg)
         self.sync_messages()
 
-        if not self.disable_thinking:
+        if not self.DISABLE_THINKING:
             # Set the LEDs to blue
             self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
             behaviour_thread = threading.Thread(target=think_about_response, args=(self.executor, self.speech))
@@ -252,6 +255,12 @@ class BaseSpeechReceiverModule(ALModule):
         
         print("DEBUG: Response took {} seconds.".format(time.time() - start_time))
         print("DEBUG: Received response text: {}".format(resp_text))
+        
+        #if resp_test contains "HTTP Error"
+        if "HTTP Error" in resp_text:
+            print("ERR: HTTP Error in response text.")
+            self.memory.raiseEvent("Speaking", False)
+            return
         
         # Stop eyes thread
         eyes_thread.join()
@@ -285,7 +294,10 @@ class BaseSpeechReceiverModule(ALModule):
                 message_dict = eval(resp_text.replace('true', 'True').replace('false', 'False'))
                 chat_response = message_dict.get('chat_response', '')
                 self.conversation_ongoing = message_dict.get('conversation_ongoing', False)
-                
+
+                if self.conversation_ongoing is True:
+                    self.memory.raiseEvent("ConversationOngoing", True)
+
                 if not chat_response:
                     print("DEBUG: Message does not contain 'chat_response' or told not to respond.")
                     self.memory.raiseEvent("Speaking", False)
@@ -334,6 +346,7 @@ class BaseSpeechReceiverModule(ALModule):
                     f.close()
 
             if not self.conversation_ongoing:
+                self.memory.raiseEvent("ConversationOngoing", False)
                 self.memory.raiseEvent("ResetConversation", True)
 
             self.memory.raiseEvent("Speaking", False)

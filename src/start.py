@@ -149,10 +149,22 @@ def main():
     audio.setOutputVolume(volume)
     print("INF: SpeechRecognitionModule: volume set to %s" % volume)
     
+    # Wake up robot
+    try:
+        motion_service = ALProxy("ALMotion")
+        motion_service.wakeUp()
+    except Exception as e:
+        print("ERR: Could not wake up robot, error: {}".format(e))
+        print("ERR: Exiting, this exception cannot be handled...")
+        sys.exit(1)
+
     aba = ALProxy("ALBasicAwareness")
     aba.setEnabled(True)
-    aba.setEngagementMode("SemiEngaged") # Unengaged, FullyEngaged, SemiEngaged TODO: tweak this
+    aba.setEngagementMode("FullyEngaged") # Unengaged, FullyEngaged, SemiEngaged TODO: tweak this
     aba.setTrackingMode("MoveContextually") # Head, WholeBody, MoveContextually, BodyRotation TODO: tweak this
+    
+    afd = ALProxy("ALFaceDetection")
+    afd.enableTracking(True)
     
     # declear events sharing between different modules
     memory = ALProxy("ALMemory")
@@ -171,6 +183,7 @@ def main():
     memory.declareEvent("Sync")
     memory.declareEvent("SyncMessages")
     memory.declareEvent("Exploring")
+    memory.declareEvent("ConversationOngoing")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
@@ -190,7 +203,7 @@ def main():
     
     global Exploring
     Exploring = ExploringModule("Exploring")
-    Exploring.start()
+    Exploring.start_tracking()
 
     # auto-detection
     SpeechRecognition.setHoldTime(tofloat(os.getenv('HOLD_TIME')) or 2.0)

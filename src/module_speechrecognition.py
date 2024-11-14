@@ -113,7 +113,7 @@ class SpeechRecognitionModule(ALModule):
     # __init__ - end
     def __del__( self ):
         print( "INF: SpeechRecognitionModule.__del__: cleaning everything" )
-        self.stop()    
+        self.stop()
 
     def start( self ):
         if(self.isStarted):
@@ -169,7 +169,7 @@ class SpeechRecognitionModule(ALModule):
         
         self.is_allowed_recording = allowed_recording
         self.toggle_status()
-        self.memory.raiseEvent("ResetConversation", True)
+        # self.memory.raiseEvent("ResetConversation", True)
 
     def toggle_status(self):
         if self.eye_contact and not self.is_speaking and self.is_allowed_recording:
