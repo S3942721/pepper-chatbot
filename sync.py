@@ -3,13 +3,13 @@ import sys
 import subprocess
 
 # Constants
-DEFAULT_IP = "10.234.7.154"
+DEFAULT_IP = "192.168.1.100"
 REMOTE_USER = "nao"
 REMOTE_FOLDER = "/home/nao/pepperchat"
 LOCAL_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
-HTML_FILE = "chatbot.html"
+HTML_FILE = os.path.join(os.path.dirname(LOCAL_FOLDER), "chatbot.html")
 HTML_REMOTE_PATH = "~/.local/share/PackageManager/apps/rmit-race/html/chatbot.html"
-PASSWORD_FILE = ".pepper_password"
+PASSWORD_FILE = os.path.join(os.path.dirname(LOCAL_FOLDER), ".pepper_password")
 REMOTE_JSON_FILE = "pepperchat/behaviours/behaviours_described.json"
 LOCAL_JSON_FILE = os.path.join(LOCAL_FOLDER, "robot_behaviours_described.json")
 REMOTE_EXPLORER_FOLDER = "~/.local/share/Explorer"
@@ -25,6 +25,8 @@ def run_command(command):
     print(result.stdout)
 
 def sync_files(remote_ip):
+    print("Syncing remote files.")
+    print()
     try:
         # Copy the behaviours_described.json file from the remote system to the local system
         check_file_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'test -f {REMOTE_JSON_FILE}'"

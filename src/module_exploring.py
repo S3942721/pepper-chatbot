@@ -1,3 +1,4 @@
+import random
 import threading
 from naoqi import ALProxy, ALModule
 import time
@@ -10,10 +11,19 @@ class ExploringModule(ALModule):
         ALModule.__init__(self, name)
         self.BIND_PYTHON(self.getName(), "callback")
         self.FRACTION_MAX_SPEED = 0.8
+        self.MAX_WALK_VEL = 0.25 # Default 0.35, Min 0.1 Max 0.55
         self.OBSTACLE_CLOSE_DISTANCE = 0.4  # distance in meters to consider an obstacle close
         self.OBSTACLE_PERSISTANCE_TIME = 3  # number of seconds to remember the recent obstacle
         self.DISTANCE_FROM_PERSON = 0.8  # distance in meters to keep from the person
-        self.MOVE_THRESHOLD = 0.25  # distance in meters to consider no movement
+        self.CLOSE_DISTANCE_FROM_PERSON = 1.5  # distance in meters to keep from the person
+        self.MOVE_THRESHOLD = 0.2  # distance in meters to consider no movement
+        self.MOVE_MIN_THRESHOLD = 0.0  # distance in meters so robot can turn
+        self.NON_INTERACTIVE_TIMEOUT = 10  # number of seconds to wait with a person before starting exploration
+        self.EXPLORATION_RADIUS = 500.0  # radius in meters to explore
+        self.SPEAK_TIMEOUT = 15  # number of seconds to wait before saying hello again
+        self.SPEAK_TIMEOUT_MS = self.SPEAK_TIMEOUT * 1000  # number of milliseconds to wait before saying hello again
+        self.SPEAK_ON_APPROACH = True # speak when approaching a person or not
+        self.MANUAL_COLLISION_AVOIDANCE = False  # enable manual collision avoidance
         
         self.exploring = False
         self.tracking_person = False
@@ -25,7 +35,10 @@ class ExploringModule(ALModule):
         self.face_6d_pos = None
         self.close_obstacle_detected = False
         self.conversation_ongoing = False
-
+        self.move_config = [["MaxVelXY", self.MAX_WALK_VEL]]
+        self.spoken_to_person = False
+        self.last_speak_time = 0
+        
         # Get the services ALNavigation and ALMotion.
         self.memory = ALProxy("ALMemory")
         self.tracker_service = ALProxy("ALTracker")
@@ -33,7 +46,7 @@ class ExploringModule(ALModule):
         self.posture_service = ALProxy("ALRobotPosture")
         self.navigation_service = ALProxy("ALNavigation")
 
-        self.posture_service.goToPosture("StandInit", self.FRACTION_MAX_SPEED)
+        # self.posture_service.goToPosture("StandInit", self.FRACTION_MAX_SPEED)
 
         # Subscribe to the events
         self.memory.subscribeToEvent("ResetConversation", self.getName(), "handle_reset_conversation")
@@ -43,6 +56,7 @@ class ExploringModule(ALModule):
         self.memory.subscribeToEvent("FaceDetected", self.getName(), "on_face_detected")
         self.memory.subscribeToEvent("Navigation/AvoidanceNavigator/ObstacleDetected", self.getName(), "obstacle_detected")
         self.memory.subscribeToEvent("PeoplePerception/VisiblePeopleList", self.getName(), "people_visible_changed")
+        self.memory.subscribeToEvent("PeoplePerception/PeopleDetected", self.getName(), "on_people_detected")
         self.memory.subscribeToEvent("ConversationOngoing", self.getName(), "handle_conversation_ongoing")
 
         print("INF: ExploringModule: initialized with name: {}".format(name))
@@ -84,15 +98,56 @@ class ExploringModule(ALModule):
         self.close_obstacle_detected = False
         print("INF: ExploringModule: obstacle expired")
 
+    def on_people_detected(self, event_name, value):
+        # See if there is a person close
+
+        try:
+            person_data = value[1]
+
+            if person_data:
+                distance_to_person = min(person[1] for person in person_data)
+            else:
+                distance_to_person = None
+
+            # Check if the person is close
+            self.person_close = distance_to_person < self.CLOSE_DISTANCE_FROM_PERSON
+            # print("INF: ExploringModule: Person is close: {}".format(self.person_close))
+
+            if self.person_close:
+                print("INF: ExploringModule: Person is close")
+                # Asess if we want to speak to the person
+                if self.SPEAK_ON_APPROACH:
+                    self.speak_to_person()
+                
+                # Stop the exploration if the person is close
+                self.stop_exploring()
+                self.start_tracking()
+
+        except Exception as e:
+            print("ERR: ExploringModule: People Detected Failed: {}".format(e))
+
+    def speak_to_person(self):
+        # At a maximum of once every SPEAK_TIMEOUT seconds, say a random greeting from the list
+        print("INF: ExploringModule: speak_to_person called")
+        if not self.spoken_to_person and (time.time() - self.last_speak_time) > self.SPEAK_TIMEOUT:
+            print("INF: ExploringModule: Speaking to person")
+            print("INF: ExploringModule: Time since last spoken: {}".format(time.time() - self.last_speak_time))
+            messages = ["^start(excited) Hello ^wait(excited)", "^start(excited) Hi ^wait(excited)", "^start(excited) Hey ^wait(excited)", "^start(excited) Greetings ^wait(excited)"]
+            message = random.choice(messages)
+            print("INF: ExploringModule: Saying: {}".format(message))
+            self.memory.raiseEvent("Say", message)
+            self.spoken_to_person = True
+            self.last_speak_time = time.time()
+
     def on_face_detected(self, event_name, value):
         """
         FaceDetected =
             [
-            TimeStamp,
-            [ FaceInfo[N], Time_Filtered_Reco_Info ],
-            CameraPose_InTorsoFrame,
-            CameraPose_InRobotFrame, *** info of interest - describes the Position6D of the camera at the time the image was taken, in FRAME_ROBOT [x,y,x,wx,wy,wz] ***
-            Camera_Id
+                TimeStamp,
+                [ FaceInfo[N], Time_Filtered_Reco_Info ],
+                CameraPose_InTorsoFrame,
+                CameraPose_InRobotFrame, *** info of interest - describes the Position6D of the camera at the time the image was taken, in FRAME_ROBOT [x,y,x,wx,wy,wz] ***
+                Camera_Id
             ]
         """
         # print("INF: ExploringModule: on_face_detected called with value: {}".format(value))
@@ -108,7 +163,7 @@ class ExploringModule(ALModule):
 
     def navigate_to(self, x, y, theta):
         # Move to the given position
-        # print("INF: ExploringModule: Navigating to x={}, y={}, theta={}".format(x, y, theta))
+        print("INF: ExploringModule: Target navigation x={}, y={}, theta={}".format(x, y, theta))
         # self.navigation_service.navigateTo(x, y)
         front_sonar = self.memory.getData("Device/SubDeviceList/Platform/Front/Sonar/Sensor/Value")
         rear_sonar = self.memory.getData("Device/SubDeviceList/Platform/Back/Sonar/Sensor/Value")
@@ -118,39 +173,41 @@ class ExploringModule(ALModule):
         right_ir_obstacle = bool(self.memory.getData("Device/SubDeviceList/Platform/InfraredSpot/Right/Sensor/Value"))
         # Clamp x and y to ensure minimal movement threshold, if the value is less than the threshold, set to 0
         if abs(x) < self.MOVE_THRESHOLD:
-            x = 0
+            x = self.MOVE_MIN_THRESHOLD if x > 0 else -self.MOVE_MIN_THRESHOLD
         if abs(y) < self.MOVE_THRESHOLD:
-            y = 0
+            y = self.MOVE_MIN_THRESHOLD if y > 0 else -self.MOVE_MIN_THRESHOLD
 
         if self.close_obstacle_detected:
             print("INF: ExploringModule: close obstacle detected, using navigateTo instead of moveTo")
             self.motion_service.navigateTo(x, y)
         else:
-            self.motion_service.moveTo(x, y, theta)
-            # Clamp x and y based on sensor readings
-            if front_sonar < self.OBSTACLE_CLOSE_DISTANCE:
-                print("INF: ExploringModule: front_sonar: {}".format(front_sonar))
-                x = min(0, x)  # Prevent moving forward
-            if rear_sonar < self.OBSTACLE_CLOSE_DISTANCE:
-                print("INF: ExploringModule: rear_sonar: {}".format(rear_sonar))
-                x = max(0, x)  # Prevent moving backward
-            if left_ir_obstacle:
-                print("INF: ExploringModule: left_ir_obstacle: {}".format(left_ir_obstacle))
-                y = max(0, y)  # Prevent moving left
-            if right_ir_obstacle:
-                print("INF: ExploringModule: right_ir_obstacle: {}".format(right_ir_obstacle))
-                y = min(0, y)  # Prevent moving right
+            if self.MANUAL_COLLISION_AVOIDANCE:
+                # Clamp x and y based on sensor readings
+                if front_sonar < self.OBSTACLE_CLOSE_DISTANCE:
+                    print("INF: ExploringModule: front_sonar: {}".format(front_sonar))
+                    x = min(0, x)  # Prevent moving forward
+                if rear_sonar < self.OBSTACLE_CLOSE_DISTANCE:
+                    print("INF: ExploringModule: rear_sonar: {}".format(rear_sonar))
+                    x = max(0, x)  # Prevent moving backward
+                if left_ir_obstacle:
+                    print("INF: ExploringModule: left_ir_obstacle: {}".format(left_ir_obstacle))
+                    y = max(0, y)  # Prevent moving left
+                if right_ir_obstacle:
+                    print("INF: ExploringModule: right_ir_obstacle: {}".format(right_ir_obstacle))
+                    y = min(0, y)  # Prevent moving right
 
-            # Move to the given position
-            print("INF: ExploringModule: Navigating to x={}, y={}, theta={}".format(x, y, theta))
-            self.motion_service.moveTo(x, y, theta)
+            if x != 0 or y != 0:
+                # Move to the given position
+                print("INF: ExploringModule: Navigating to x={}, y={}, theta={}".format(x, y, theta))
+                self.motion_service.moveTo(x, y, theta, self.move_config)
+            else:
+                print("INF: ExploringModule: No movement required")
 
     def on_human_tracked(self, event_name, tracked_person_id):
         print("INF: ExploringModule: on_human_tracked called with value: {}".format(tracked_person_id))
         if tracked_person_id != -1 and tracked_person_id is not None and tracked_person_id is not True:
             self.current_person = tracked_person_id
-            if self.exploring:
-                self.start_tracking()
+            self.start_tracking()
         else:
             self.current_person = None
 
@@ -166,54 +223,67 @@ class ExploringModule(ALModule):
         else:
             if self.eye_contact:
                 self.eye_contact_lost_timer = threading.Timer(self.eye_contact_lost_timeout, self.handle_eye_contact_lost)
-                self.eye_contact_lost_timer.start_exploring()
+                self.eye_contact_lost_timer.start()
 
     def handle_eye_contact_lost(self):
         self.eye_contact = False
-        self.stop_tracking()
         self.face_6d_pos = None
-        print("INF: ExploringModule: eye_contact lost for 5 seconds, starting exploration")
-        self.start_exploring()
+        if not self.conversation_ongoing:
+            self.stop_tracking()
+            print("INF: ExploringModule: eye_contact lost for 5 seconds, starting exploration")
+            self.start_exploring()
 
     def start_tracking(self):
         try:
+            self.stop_exploring()
+            
             if not self.current_person or self.current_person is None:
                 raise Exception("No person to track")
+
             # Stop the exploration if it is running
-            self.stop_exploring()
+
             # Add target to track.
             print("INF: ExploringModule: Tracking person with ID: {}".format(self.current_person))
-            # Extract position of the person from ID in the memory PeoplePerception/Person/<ID>/PositionInRobotFrame
+
+            # Extract position of a person from ID in the memory PeoplePerception/Person/<ID>/PositionInRobotFrame
             try:
                 person_position = self.memory.getData("PeoplePerception/Person/" + str(self.current_person) + "/PositionInRobotFrame")
+
             except Exception as e:
                 print("ERR: ExploringModule: Failed to get target person position: {}".format(e))
                 try:
                     # Try to get the position from any other people in the memory
                     people_ids = self.visible_people
                     print("INF: ExploringModule: Failed with existing person, searching IDs: {}".format(people_ids))
+
                     if people_ids:
                         for person_id in people_ids:
                             if person_id is not None:
                                 person_position = self.memory.getData("PeoplePerception/Person/" + str(person_id) + "/PositionInRobotFrame")
                             if person_position:
                                 break
+
                     raise Exception("No person position found")
+
                 except Exception as e:
                     print("ERR: ExploringModule: Failed to get any person position: {}".format(e))
                     print("INF: ExploringModule: Tracking face instead of person")
                     self.track_face(self.face_6d_pos)
                     return
+
             # take arctan(y/x) to get the angle
             theta = math.atan2(person_position[1], person_position[0])
-            # self.navigate_to(person_position[0], person_position[1], theta)
+            
             print("INF: ExploringModule: Person position: {}".format(person_position))
+            
             # Move to x cm in front of the person, along the direction of theta
             distance_in_front = self.DISTANCE_FROM_PERSON # x cm in front of the person
             target_x = person_position[0] - distance_in_front * math.cos(theta)
             target_y = person_position[1] - distance_in_front * math.sin(theta)
+
             self.navigate_to(target_x, target_y, theta)
             self.tracking_person = True
+
         except (RuntimeError, Exception) as e:
             print("ERR: ExploringModule: Failed to track person: {}".format(e))
             # Turn to the last known face position
@@ -224,6 +294,7 @@ class ExploringModule(ALModule):
             # print("INF: ExploringModule: no person to track, turning to the last known face position")
             self.navigate_to(face_6d_pos[0], face_6d_pos[1], face_6d_pos[3])
             self.tracking_person = True
+            self.person_close = False
         else:
             print("INF: ExploringModule: No face to track, exploring instead")
             self.start_exploring()
@@ -231,6 +302,8 @@ class ExploringModule(ALModule):
     def stop_tracking(self):
         # Stop tracker.
         self.tracking_person = False
+        self.person_close = False
+        self.spoken_to_person = False
 
     def start_exploring(self):
         print("INF: ExploringModule: start called")
@@ -241,8 +314,7 @@ class ExploringModule(ALModule):
 
         # Run the exploration asynchronously
         def exploration_task(self):
-            radius = 500.0
-            exploring = True
+            radius = self.EXPLORATION_RADIUS
             print("INF: ExploringModule: exploration_task started with radius: {}".format(radius))
             self.navigation_service.explore(radius)
 
@@ -257,7 +329,7 @@ class ExploringModule(ALModule):
         self.exploring = True
 
     def stop_exploring(self):
-        print("INF: ExploringModule: stop called")
+        # print("INF: ExploringModule: stop called")
         self.exploring = False
         self.navigation_service.stopExploration()
-        print("INF: ExploringModule: stopped exploring!")
+        # print("INF: ExploringModule: stopped exploring!")

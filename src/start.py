@@ -184,6 +184,8 @@ def main():
     memory.declareEvent("SyncMessages")
     memory.declareEvent("Exploring")
     memory.declareEvent("ConversationOngoing")
+    memory.declareEvent("Say")
+    memory.declareEvent("JSONSay")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)

@@ -54,5 +54,5 @@ def main(session):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--ip", type=str, default="10.234.7.154",
+    parser.add_argument("--ip", type=str, default="192.168.1.100",
                         help="Robot IP address. On robot or Local Naoqi: use
