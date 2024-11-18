@@ -3,7 +3,7 @@ import sys
 import subprocess
 
 # Constants
-DEFAULT_IP = "10.234.7.154"
+DEFAULT_IP = "192.168.1.100"
 REMOTE_USER = "nao"
 REMOTE_FOLDER = "/home/nao/pepperchat"
 LOCAL_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
