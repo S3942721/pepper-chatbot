@@ -22,6 +22,9 @@ class BaseSpeechReceiverModule(ALModule):
         ALModule.__init__(self, strModuleName )
         self.BIND_PYTHON( self.getName(),"callback" )
 
+        self.SAY_SIGNAL = "Say"
+        self.JSON_SAY_SIGNAL = "JSONSay"
+
         self.port = port
         self.strNaoIp = strNaoIp
 
@@ -48,9 +51,9 @@ class BaseSpeechReceiverModule(ALModule):
         self.reset_message()
 
         self.save_csv = save_csv
-        
+
         self.conversation_ongoing = False
-        self.disable_thinking = True
+        self.DISABLE_THINKING = False
 
         if self.save_csv:
             with open('dialogue.csv', 'w') as f:
@@ -59,9 +62,9 @@ class BaseSpeechReceiverModule(ALModule):
 
         print("DEBUG: Initializing BehaviourExecutor with behaviour_file: {}".format(self.behaviour_file))
         self.executor = BehaviourExecutor(self.behaviour_file)
-        
+
         TESTING_BEHAVIOURS = False
-        
+
         if TESTING_BEHAVIOURS:
             index = 0
             previous_description = "<NO DESCRIPTION>"
@@ -99,6 +102,9 @@ class BaseSpeechReceiverModule(ALModule):
     def clear_all(self, _, value):
         self.reset_message()
         self.conversation_ongoing = False
+        self.memory.raiseEvent("ConversationOngoing", False)
+        self.memory.raiseEvent("Speaking", False)
+        self.memory.raiseEvent("RunningBehaviour", False)
 
     def reset_message(self):
         self.messages_to_llm = [{
@@ -110,6 +116,8 @@ class BaseSpeechReceiverModule(ALModule):
 
     def start( self ):
         self.memory.subscribeToEvent("SpeechRecognition", self.getName(), "processRemote")
+        self.memory.subscribeToEvent("Say", self.getName(), "processRemote")
+        self.memory.subscribeToEvent("JSONSay", self.getName(), "processRemote")
         # print( "INF: ReceiverModule: started!" )
 
 
@@ -167,6 +175,7 @@ class BaseSpeechReceiverModule(ALModule):
         # self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
 
     def processRemote(self, signalName, message):
+        print("DEBUG: Received from: {}".format(signalName))
         print("DEBUG: Received message: {}".format(message))
         # While we process the message, we should stop the speech recognition
         self.memory.raiseEvent("Speaking", True)
@@ -214,62 +223,74 @@ class BaseSpeechReceiverModule(ALModule):
         # New conversation will be triggered by seeing if the keywords are present and setting conversation_ongoing to True
         print("DEBUG: Received message: {}".format(message))
         
-        # Replace all trigger keywords with "Pepper" in the message        
-        for keyword in PEPPER_TRIGGER_KEYWORDS:
-            message = re.sub(r'\b{}\b'.format(re.escape(keyword)), PEPPER_NAME, message, flags=re.IGNORECASE)
+        # Convert the message to json if it is not already
+        if message and signalName == self.SAY_SIGNAL:
+                message_dict = {'chat_response': message, 'conversation_ongoing': False}
+                resp_text = json.dumps(message_dict)
+        
+        # Send the message to the chatbot server
+        if not (signalName == self.SAY_SIGNAL or signalName == self.JSON_SAY_SIGNAL):
+            # Replace all trigger keywords with "Pepper" in the message        
+            for keyword in PEPPER_TRIGGER_KEYWORDS:
+                message = re.sub(r'\b{}\b'.format(re.escape(keyword)), PEPPER_NAME, message, flags=re.IGNORECASE)
 
-        # If we are in a pepper trigger mode, we should only respond to messages that contain "Pepper"
-        if not self.conversation_ongoing and PEPPER_TRIGGER:
-            if PEPPER_NAME.lower() not in message.lower():
-                print("DEBUG: Message does not contain the trigger keyword 'Pepper'.")
-                self.reset_message()
+            # If we are in a pepper trigger mode, we should only respond to messages that contain "Pepper"
+            if not self.conversation_ongoing and PEPPER_TRIGGER:
+                if PEPPER_NAME.lower() not in message.lower():
+                    print("DEBUG: Message does not contain the trigger keyword 'Pepper'.")
+                    self.reset_message()
+                    self.memory.raiseEvent("Speaking", False)
+                    return
+
+            print("DEBUG: Sanitised message: {}".format(message))
+
+            user_msg = {'role':'user', 'content': message}
+            self.messages.append(user_msg)
+            self.messages_to_llm.append(user_msg)
+            self.sync_messages()
+
+            if not self.DISABLE_THINKING:
+                # Set the LEDs to blue
+                self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
+                behaviour_thread = threading.Thread(target=think_about_response, args=(self.executor, self.speech))
+                behaviour_thread.start()
+
+                eyes_thread = threading.Thread(target=eyes_thinking_about_response)
+                eyes_thread.start()
+
+            start_time = time.time()
+            print("DEBUG: Sending message to chatbot server")
+
+            # Send the message to the chatbot server
+            resp_text = chat_completion(
+                self.server_url, 
+                self.messages_to_llm, 
+                route=self.base_route, 
+                model_name=self.model_name, 
+                api_key=self.api_key
+            )
+        
+            print("DEBUG: Response took {} seconds.".format(time.time() - start_time))
+            print("DEBUG: Received response text: {}".format(resp_text))
+            
+            #if resp_test contains "HTTP Error"
+            if "HTTP Error" in resp_text:
+                print("ERR: HTTP Error in response text.")
                 self.memory.raiseEvent("Speaking", False)
                 return
-
-        print("DEBUG: Sanitised message: {}".format(message))
-        
-        user_msg = {'role':'user', 'content': message}
-        self.messages.append(user_msg)
-        self.messages_to_llm.append(user_msg)
-        self.sync_messages()
-
-        if not self.disable_thinking:
-            # Set the LEDs to blue
-            self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
-            behaviour_thread = threading.Thread(target=think_about_response, args=(self.executor, self.speech))
-            behaviour_thread.start()
-
-            eyes_thread = threading.Thread(target=eyes_thinking_about_response)
-            eyes_thread.start()
-
-        start_time = time.time()
-        print("DEBUG: Sending message to chatbot server")
-
-        # Send the message to the chatbot server
-        resp_text = chat_completion(
-            self.server_url, 
-            self.messages_to_llm, 
-            route=self.base_route, 
-            model_name=self.model_name, 
-            api_key=self.api_key
-        )
-        
-        print("DEBUG: Response took {} seconds.".format(time.time() - start_time))
-        print("DEBUG: Received response text: {}".format(resp_text))
-        
-        if not self.disable_thinking:
+            
             # Stop eyes thread
             eyes_thread.join()
             print("After eyes_thread.join()")
-        
+            
             # Forcibly stop behaviour thread
             if behaviour_thread.is_alive():
                 self.stop_listening_thread.set()
                 behaviour_thread.join()
-        
-        # Set the LEDs to white
-        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
-        
+            
+            # Set the LEDs to white
+            self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
+
         # Sanitize the response text to extract only the JSON component
         json_start = resp_text.find('{')
         json_end = resp_text.rfind('}') + 1
@@ -278,16 +299,22 @@ class BaseSpeechReceiverModule(ALModule):
         else:
             print("DEBUG: No valid JSON found in response text.")
             self.memory.raiseEvent("Speaking", False)
-            return
-        
+            return            
+
+        # Sanitize the response to text replace any non ascii characters with ascii equivalents
+        resp_text = resp_text.encode('ascii', 'ignore').decode('ascii')
+
         if resp_text:
-            # Decode the message JSON format, example: {'chat_response': 'Hey, how are you?', 'behaviour_request': 'hey', 'behaviour_order': 'before'}
+            # Decode the message JSON format, example: {'chat_response': 'Hey, how are you?', `conversation_ongoing`: True}
             # Only decode the message if it is in the correct JSON format
             try:
                 message_dict = eval(resp_text.replace('true', 'True').replace('false', 'False'))
                 chat_response = message_dict.get('chat_response', '')
                 self.conversation_ongoing = message_dict.get('conversation_ongoing', False)
-                
+
+                if self.conversation_ongoing is True:
+                    self.memory.raiseEvent("ConversationOngoing", True)
+
                 if not chat_response:
                     print("DEBUG: Message does not contain 'chat_response' or told not to respond.")
                     self.memory.raiseEvent("Speaking", False)
@@ -311,18 +338,18 @@ class BaseSpeechReceiverModule(ALModule):
             
             behaviour_triggered = False
             
-            # Only dispaly the message if the chatbot wants to respond
-            self.memory.raiseEvent("UserMessage", message)
+            if not (signalName == self.SAY_SIGNAL or signalName == self.JSON_SAY_SIGNAL):
+                # Only dispaly the message if the chatbot wants to respond
+                self.memory.raiseEvent("UserMessage", message)
             
             # Clear speech recognition buffer
             self.memory.raiseEvent("ClearSpeechRecognitionBuffer", None)
- 
+
             print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
             self.memory.raiseEvent("PepperMessage", spoken_response)
             self.memory.raiseEvent("RunningBehaviour", True)
-            self.memory.raiseEvent("Speaking", True)
             self.speech.say(resp_message)
-            # self.memory.raiseEvent("Speaking", False)
+
             if(len(self.messages_to_llm) > 1):
                 self.messages.append({'role':'assistant','content':resp_message})
                 self.messages_to_llm.append({'role':'assistant','content':resp_text})
@@ -337,6 +364,8 @@ class BaseSpeechReceiverModule(ALModule):
                     f.close()
 
             if not self.conversation_ongoing:
-                self.memory.raiseEvent("ResetConversation", True)
+                self.memory.raiseEvent("ConversationOngoing", False)
 
-            self.memory.raiseEvent("Speaking", False)
+                if not (signalName == self.SAY_SIGNAL or signalName == self.JSON_SAY_SIGNAL):
+                    self.memory.raiseEvent("ResetConversation", True)
+        self.memory.raiseEvent("Speaking", False)
