@@ -71,6 +71,7 @@ class SpeechRecognitionModule(ALModule):
             self.memory.subscribeToEvent("EyeContact", self.getName(), "eye_contact_toggle")
             self.memory.subscribeToEvent("Speaking", self.getName(), "speaking_toggle")
             self.memory.subscribeToEvent("ControlRecording", self.getName(), "recording_toggle")
+            self.memory.subscribeToEvent("Mute", self.getName(), "mute")
             self.memory.subscribeToEvent("ClearSpeechRecognitionBuffer", self.getName(), "clear_buffer")
             self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
 
@@ -158,18 +159,19 @@ class SpeechRecognitionModule(ALModule):
         self.toggle_status()
 
     def recording_toggle(self, _, allowed_recording):
-        if allowed_recording:
-            audio = ALProxy( "ALAudioDevice")
-            audio.setOutputVolume(self.volume)
-            print("INF: SpeechRecognitionModule: volume set to %s" % self.volume)
-        else:
-            audio = ALProxy( "ALAudioDevice")
-            audio.setOutputVolume(0)
-            print("INF: SpeechRecognitionModule: volume set to 0")
-        
         self.is_allowed_recording = allowed_recording
         self.toggle_status()
         # self.memory.raiseEvent("ResetConversation", True)
+
+    def mute(self, _, is_muted):
+        if is_muted:
+            audio = ALProxy( "ALAudioDevice")
+            audio.setOutputVolume(0)
+            print("INF: SpeechRecognitionModule: volume set to 0")
+        else:
+            audio = ALProxy( "ALAudioDevice")
+            audio.setOutputVolume(self.volume)
+            print("INF: SpeechRecognitionModule: volume set to %s" % self.volume)
 
     def toggle_status(self):
         if self.eye_contact and not self.is_speaking and self.is_allowed_recording:

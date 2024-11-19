@@ -180,6 +180,7 @@ def main():
     memory.declareEvent("ResetConversation")
     memory.declareEvent("HealthyCheck")
     memory.declareEvent("ControlRecording")
+    memory.declareEvent("Mute")
     memory.declareEvent("Sync")
     memory.declareEvent("SyncMessages")
     memory.declareEvent("Exploring")
