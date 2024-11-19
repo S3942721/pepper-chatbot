@@ -251,6 +251,7 @@ QiSession(function(session) {
 
         function handleStopping(send_event) {
             send_event && ALMemory.raiseEvent("ControlRecording", stopped);
+            send_event && ALMemory.raiseEvent("Mute", !stopped);
             stopped = !stopped;
             stopped && setLog("Recording paused");
             record_controller.innerHTML = stopped ? START_RECORD : PAUSE_RECORD;

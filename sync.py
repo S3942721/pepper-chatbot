@@ -27,17 +27,17 @@ def run_command(command):
 def sync_files(remote_ip):
     print("Syncing remote files.")
     print()
-    try:
-        # Copy the behaviours_described.json file from the remote system to the local system
-        check_file_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'test -f {REMOTE_JSON_FILE}'"
-        result = subprocess.run(check_file_command, shell=True, capture_output=True, text=True)
-        if result.returncode == 0:
-            json_copy_command = f"sshpass -f {PASSWORD_FILE} scp {REMOTE_USER}@{remote_ip}:{REMOTE_JSON_FILE} {LOCAL_JSON_FILE}"
-            run_command(json_copy_command)
-        else:
-            print(f"Warning: {REMOTE_JSON_FILE} does not exist on the remote system.")
-    except Exception as e:
-        print(f"Failed to copy JSON file: {e}")
+    # try:
+    #     # Copy the behaviours_described.json file from the remote system to the local system
+    #     check_file_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'test -f {REMOTE_JSON_FILE}'"
+    #     result = subprocess.run(check_file_command, shell=True, capture_output=True, text=True)
+    #     if result.returncode == 0:
+    #         json_copy_command = f"sshpass -f {PASSWORD_FILE} scp {REMOTE_USER}@{remote_ip}:{REMOTE_JSON_FILE} {LOCAL_JSON_FILE}"
+    #         run_command(json_copy_command)
+    #     else:
+    #         print(f"Warning: {REMOTE_JSON_FILE} does not exist on the remote system.")
+    # except Exception as e:
+    #     print(f"Failed to copy JSON file: {e}")
 
     try:
         """Sync local files to the remote system."""
@@ -55,18 +55,15 @@ def sync_files(remote_ip):
         print(f"Failed to copy local folder to remote system: {e}")
 
     try:
+        # Create the remote directory if it does not exist
+        create_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p ~/.local/share/PackageManager/apps/rmit-race/html'"
+        run_command(create_dir_command)
+
         # Copy the chatbot.html file to the remote system
         html_copy_command = f"sshpass -f {PASSWORD_FILE} scp {HTML_FILE} {REMOTE_USER}@{remote_ip}:{HTML_REMOTE_PATH}"
         run_command(html_copy_command)
     except Exception as e:
         print(f"Failed to copy HTML file: {e}")
-
-    try:
-        # Copy the contents of the remote Explorer folder to the local explorer folder
-        explorer_copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {REMOTE_USER}@{remote_ip}:{REMOTE_EXPLORER_FOLDER}/. {LOCAL_EXPLORER_FOLDER}"
-        run_command(explorer_copy_command)
-    except Exception as e:
-        print(f"Failed to copy Explorer folder: {e}")
 
 def main():
     """Main function to handle command line arguments and initiate file sync."""
