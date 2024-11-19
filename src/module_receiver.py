@@ -102,6 +102,8 @@ class BaseSpeechReceiverModule(ALModule):
         self.reset_message()
         self.conversation_ongoing = False
         self.memory.raiseEvent("ConversationOngoing", False)
+        self.memory.raiseEvent("Speaking", False)
+        self.memory.raiseEvent("RunningBehaviour", False)
 
     def reset_message(self):
         self.messages_to_llm = [{
