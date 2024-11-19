@@ -3,6 +3,7 @@ from module_speechrecognition import SpeechRecognitionModule
 from module_eyecontact import EyeContactModule
 from module_healthy_check import HealthyCheckModule
 from naoqi import ALProxy, ALBroker
+from module_socket import SocketClient
 
 import time
 import os
@@ -88,7 +89,7 @@ def main():
         save_csv=False,
         prompt='',
         fprompt='',
-        fbehaviours='/pepperchat/behaviours/behaviours_described.json',
+        fbehaviours='/home/nao/pepperchat/behaviours/behaviours_described.json',
         webview=WEBVIEW
     )
 
@@ -109,9 +110,9 @@ def main():
     fbehaviours=opts.fbehaviours
     webview = opts.webview
 
-    if not server_url:
-        print('Error: Services route not specified!')
-        return
+    # if not server_url:
+    #     print('Error: Services route not specified!')
+    #     return
     
     try:
         if not prompt and fprompt:
@@ -169,6 +170,8 @@ def main():
     memory.declareEvent("ControlRecording")
     memory.declareEvent("Sync")
     memory.declareEvent("SyncMessages")
+    memory.declareEvent("LoadHTML")
+    memory.declareEvent("TriggerGapFill")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
@@ -177,23 +180,23 @@ def main():
 
     speech_recoginition_url = os.getenv('SPEECH_RECOGINITION_URL') or server_url
 
-    global SpeechRecognition
-    SpeechRecognition = SpeechRecognitionModule(
-        "SpeechRecognition", ip, port,
-        speech_recoginition_url, speech_route, speech_api_key, volume
-    )
+    # global SpeechRecognition
+    # SpeechRecognition = SpeechRecognitionModule(
+    #     "SpeechRecognition", ip, port,
+    #     speech_recoginition_url, speech_route, speech_api_key, volume
+    # )
 
     global EyeContact
     EyeContact = EyeContactModule("EyeContact")
 
     # auto-detection
-    SpeechRecognition.setHoldTime(tofloat(os.getenv('HOLD_TIME')) or 2.0)
-    SpeechRecognition.setIdleReleaseTime(tofloat(os.getenv('RELEASE_TIME')) or 1.0)
-    SpeechRecognition.setMaxRecordingDuration(tofloat(os.getenv('RECORD_DURATION')) or 7.0)
-    SpeechRecognition.setLookaheadDuration(tofloat(os.getenv('LOOK_AHEAD_DURATION')) or 0.5)
-    SpeechRecognition.setAutoDetectionThreshold(toint(os.getenv('AUTO_DETECTION_THREADSHOLD')) or 5)
-    SpeechRecognition.enableAutoDetection()
-    SpeechRecognition.start()
+    # SpeechRecognition.setHoldTime(tofloat(os.getenv('HOLD_TIME')) or 2.0)
+    # SpeechRecognition.setIdleReleaseTime(tofloat(os.getenv('RELEASE_TIME')) or 1.0)
+    # SpeechRecognition.setMaxRecordingDuration(tofloat(os.getenv('RECORD_DURATION')) or 7.0)
+    # SpeechRecognition.setLookaheadDuration(tofloat(os.getenv('LOOK_AHEAD_DURATION')) or 0.5)
+    # SpeechRecognition.setAutoDetectionThreshold(toint(os.getenv('AUTO_DETECTION_THREADSHOLD')) or 5)
+    # SpeechRecognition.enableAutoDetection()
+    # SpeechRecognition.start()
 
     global Receiver
     Receiver = BaseSpeechReceiverModule(
@@ -204,9 +207,12 @@ def main():
     )
     Receiver.start()
 
-    if webview:
-        global HealthyCheck
-        HealthyCheck = HealthyCheckModule("HealthyCheck", webview)
+    # if webview:
+    global HealthyCheck
+    HealthyCheck = HealthyCheckModule("HealthyCheck")
+
+    socket_client = SocketClient('ec2-3-104-1-96.ap-southeast-2.compute.amazonaws.com', 3456)
+    socket_client.start()
 
     try:
         while True:
@@ -218,6 +224,7 @@ def main():
         print()
         print("Interrupted by user, shutting down")
         myBroker.shutdown()
+        socket_client.join()
         sys.exit(0)
 
 if __name__ == "__main__":

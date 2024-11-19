@@ -1,0 +1,251 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style type="text/css">
+body {
+    margin: 0;
+    padding: 0;
+}
+
+* {
+    font-family: ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji",Segoe UI Symbol,"Noto Color Emoji"
+}
+
+div {
+    box-sizing: border-box;
+}
+
+#main {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#main.idle {
+    background-image: url(http://198.18.0.1/apps/rmit-race/racehub.png);
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+#main.idle * {
+    display: none !important;
+}
+
+div {
+    box-sizing: border-box;
+}
+
+.function-btn {
+    width: 200px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    position: absolute;
+    top: 0;
+}
+
+#pause-restart {
+    left: 0;
+    border-right: 1px solid black;
+}
+
+.function-btn > svg {
+    margin: auto;
+    width: 50px;
+    height: 50px;
+}
+
+.function-btn.right {
+    right: 0;
+    border-left: 1px solid black;
+}
+
+#pause-restart.not-recording {
+    background-color: red;
+    color: white;
+}
+
+#photo {
+    width: calc(100vw - 400px);
+    height: calc(100vh - 150px);
+    position: absolute;
+    left: 200px;
+    top: 0;
+    display: flex;
+    align-items: center;
+    background-color: rgb(240, 240, 240);
+}
+
+#photo > img {
+    height: 100%;
+    max-height: 100%;
+    max-width: 100%;
+    margin: auto;
+}
+
+#photo > img.wide {
+    height: auto;
+    width: 100%;
+}
+
+#indicator {
+    width: calc(100vw - 400px);
+    height: 150px;
+    position: absolute;
+    bottom: 0;
+    left: 200px;
+    background-color: white;
+    display: flex;
+}
+
+#indicator img {
+    margin: auto;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+#indicator.listening {
+    background-color: lightgray;
+}
+    </style>
+    <script src="http://198.18.0.1/libs/qimessaging/2/qimessaging.js"></script>
+</head>
+<body>
+    <div id='main' class="idle">
+        <div id="pause-restart" class="function-btn"></div>
+        <div id="photo"></div>
+        <div id="indicator">
+            <img src="http://198.18.0.1/apps/rmit-race/racehub_horizontal.png" alt="RACE HUB" />
+        </div>
+        <div id="reset" class="function-btn right">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>
+            </svg>
+        </div>
+    </div>
+</body>
+<script type="text/javascript" defer>
+// Connect to Pepper using QiSession
+const main = document.getElementById('main')
+var idle_timeout;
+var conversation_started = false;
+
+const START_RECORD = 
+'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-record-circle-fill" viewBox="0 0 16 16">'+
+    '<path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6"/>'+
+'</svg>'
+const PAUSE_RECORD = 
+'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-circle-fill" viewBox="0 0 16 16">'+
+  '<path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M6.25 5C5.56 5 5 5.56 5 6.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C7.5 5.56 6.94 5 6.25 5m3.5 0c-.69 0-1.25.56-1.25 1.25v3.5a1.25 1.25 0 1 0 2.5 0v-3.5C11 5.56 10.44 5 9.75 5"/>'+
+'</svg>'
+
+function onIdle() {
+    main.classList.add('idle')
+}
+
+function wakeUpWithDuration(duration) {
+    idle_timeout && clearTimeout(idle_timeout);
+    idle_timeout = setTimeout(onIdle, duration);
+    main.classList.remove('idle');
+}
+
+function wakeUp() {
+    wakeUpWithDuration(600000);
+}
+
+document.ontouchstart = wakeUp;
+document.onmousedown = wakeUp;
+
+const record_controller = document.getElementById('pause-restart');
+const reset_controller = document.getElementById("reset");
+const listening_indicator = document.getElementById("indicator");
+const photo = document.getElementById("photo")
+
+record_controller.innerHTML = PAUSE_RECORD;
+var stopped = false;
+
+QiSession(function(session) {
+    session.service("ALMemory").then(function(ALMemory) {
+        function handleStopping(send_event) {
+            send_event && ALMemory.raiseEvent("ControlRecording", stopped);
+            stopped = !stopped;
+            record_controller.innerHTML = stopped ? START_RECORD : PAUSE_RECORD;
+            record_controller.classList.toggle('not-recording', stopped)
+            stopped && listening_indicator.classList.remove('listening');
+            photo.textContent = '';
+            wakeUpWithDuration(5000)
+        }
+
+        ALMemory.subscriber("UserMessage").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                wakeUp()
+            });
+        });
+        ALMemory.subscriber("PepperMessage").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                if(value) {
+                    wakeUp()
+                    if(/acknowledge/i.test(value)) {
+                        photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/acknowledge.png' class='wide' alt='Acknowledgement of Country'>"
+                    } else if(/Amelia/i.test(value)) {
+                        photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/Bonnie_Amelia_Dean.jpeg' alt='Bonnie Amelia Dean'>"
+                    } else if(/Danny.*Liu/i.test(value)) {
+                        photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/Danny_Liu.jpg' alt='Danny Liu'>"
+                    } else if(/^On behalf of Professor Angela Carbone/i.test(value)) {
+                        photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/thank_you.jpg' alt='Thank You'>"
+                    }
+                } else {
+                    photo.textContent = '';
+                }
+            });
+        });
+        ALMemory.subscriber("EyeContact").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                wakeUp();
+            });
+        });
+        ALMemory.subscriber("HealthyCheck").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                value === "ping" &&
+                ALMemory.raiseEvent("HealthyCheck", "pong")
+            });
+        });
+        ALMemory.subscriber("Listening").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                if(value) {
+                    wakeUpWithDuration(30000);
+                    listening_indicator.classList.add('listening')
+                    photo.textContent = '';
+                }
+            });
+        });
+        ALMemory.subscriber("Speaking").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                wakeUp();
+                listening_indicator.classList.remove('listening')
+            });
+        });
+        ALMemory.subscriber("Sync").then(function(subscriber) {
+            subscriber.signal.connect(function(value) {
+                const allowed_recording = values.allowed_recording
+            
+                if(!allowed_recording) {
+                    stopped = true
+                    handleStopping(false)
+                }
+            });
+        });
+        record_controller.onclick = function() { handleStopping(true) }
+        reset_controller.onclick = function() { photo.textContent = ''; ALMemory.raiseEvent("ResetConversation", true); }
+    }, function(error) {});
+}, function() {});
+</script>
+</html>
+
+<!-- h: 585 / w: 946 -->

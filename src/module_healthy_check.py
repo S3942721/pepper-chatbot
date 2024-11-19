@@ -4,7 +4,7 @@ import json
 
 
 class HealthyCheckModule(ALModule):
-    def __init__(self, name, webview_url):
+    def __init__(self, name, webview_url = None):
         ALModule.__init__(self, name)
         self.BIND_PYTHON( self.getName(),"callback" )
 
@@ -18,12 +18,14 @@ class HealthyCheckModule(ALModule):
         self.memory.subscribeToEvent("ControlRecording", name, "update_recording")
         self.memory.subscribeToEvent("Speaking", name, "update_speaking")
         self.memory.subscribeToEvent("SyncMessages", name, "update_chat_history")
+        self.memory.subscribeToEvent("LoadHTML", name, "update_html_url")
 
         self.is_allowed_recording = False
         self.is_speaking = None
         self.chat_history = ''
     
     def ping(self):
+        if not self.webview_url: return
         self.memory.raiseEvent("HealthyCheck", "ping")
         self.got_pong = False
         time.sleep(1)
@@ -53,3 +55,10 @@ class HealthyCheckModule(ALModule):
 
     def update_chat_history(self, event_name, value):
         self.chat_history = value
+
+    def update_html_url(self, event_name, value):
+        print(value)
+        self.webview_url = value
+        self.tablet_service.showWebview(self.webview_url)
+        self.tablet_service.reloadPage(0)
+        self.sync()

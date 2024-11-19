@@ -40,6 +40,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
         self.memory.subscribeToEvent("Listening", self.getName(), "handle_listening")
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
+        self.memory.subscribeToEvent("TriggerGapFill", self.getName(), "trigger_gap_fill")
 
         self.messages = []
         self.messages_to_llm = []
@@ -126,6 +127,9 @@ class BaseSpeechReceiverModule(ALModule):
     def version( self ):
         return "1.1"
     
+    def trigger_gap_fill(self, _, value):
+        self.disable_thinking = not value
+
     def handle_speaking(self, _, speaking):
         if speaking:
             self.handle_listening(self, not speaking)

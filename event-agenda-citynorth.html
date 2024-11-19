@@ -82,8 +82,14 @@ div {
 
 #photo > img {
     height: 100%;
+    max-height: 100%;
     max-width: 100%;
     margin: auto;
+}
+
+#photo > img.wide {
+    height: auto;
+    width: 100%;
 }
 
 #indicator {
@@ -150,7 +156,7 @@ function wakeUpWithDuration(duration) {
 }
 
 function wakeUp() {
-    wakeUpWithDuration(30000);
+    wakeUpWithDuration(600000);
 }
 
 document.ontouchstart = wakeUp;
@@ -172,6 +178,8 @@ QiSession(function(session) {
             record_controller.innerHTML = stopped ? START_RECORD : PAUSE_RECORD;
             record_controller.classList.toggle('not-recording', stopped)
             stopped && listening_indicator.classList.remove('listening');
+            photo.textContent = '';
+            wakeUpWithDuration(5000)
         }
 
         ALMemory.subscriber("UserMessage").then(function(subscriber) {
@@ -181,18 +189,23 @@ QiSession(function(session) {
         });
         ALMemory.subscriber("PepperMessage").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
-                if(value && /danny.*liu/i.test(value)) {
-                    photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/Danny_Liu.jpg' alt='Danny Liu'>"
+                if(value) {
+                    wakeUp()
+                    if(/acknowledge/i.test(value)) {
+                        photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/acknowledge.png' class='wide' alt='Acknowledgement of Country'>"
+                    } else if(/Gershenfeld/i.test(value)) {
+                        photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/Joel_E._Cutcher_Gershenfeld.jpeg' alt='Joel E. Cutcher Gershenfeld'>"
+                    } else if(/Tom Bentley/i.test(value)) {
+                        photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/Tom_Bentley.jpeg' alt='Tom Bentley'>"
+                    }
+                } else {
+                    photo.textContent = '';
                 }
             });
         });
         ALMemory.subscriber("EyeContact").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
-                if(!value) {
-                    wakeUpWithDuration(2000)
-                } else {
-                    wakeUp();
-                }
+                wakeUp();
             });
         });
         ALMemory.subscriber("HealthyCheck").then(function(subscriber) {
@@ -204,6 +217,7 @@ QiSession(function(session) {
         ALMemory.subscriber("Listening").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
                 if(value) {
+                    wakeUpWithDuration(30000);
                     listening_indicator.classList.add('listening')
                     photo.textContent = '';
                 }
@@ -211,6 +225,7 @@ QiSession(function(session) {
         });
         ALMemory.subscriber("Speaking").then(function(subscriber) {
             subscriber.signal.connect(function(value) {
+                wakeUp();
                 listening_indicator.classList.remove('listening')
             });
         });
@@ -225,7 +240,7 @@ QiSession(function(session) {
             });
         });
         record_controller.onclick = function() { handleStopping(true) }
-        reset_controller.onclick = function() { ALMemory.raiseEvent("ResetConversation", true); }
+        reset_controller.onclick = function() { photo.textContent = ''; ALMemory.raiseEvent("ResetConversation", true); }
     }, function(error) {});
 }, function() {});
 </script>
