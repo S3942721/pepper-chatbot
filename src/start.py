@@ -5,6 +5,7 @@ from module_greetings import GreetingsModule
 from module_healthy_check import HealthyCheckModule
 from naoqi import ALProxy, ALBroker
 from module_socket import SocketClient
+from module_expressions import BehaviourExecutor
 
 import time
 import os
@@ -216,12 +217,15 @@ def main():
     # SpeechRecognition.enableAutoDetection()
     # SpeechRecognition.start()
 
+    global Expressions
+    Expressions = BehaviourExecutor("Expressions", fbehaviours, fsounds, ip, port)
+
     global Receiver
     Receiver = BaseSpeechReceiverModule(
         "Receiver", ip, port,
         server_url=server_url, base_route=chat_route,
         api_key=api_key, model_name=model_name, save_csv=save_csv,
-        system_prompt=prompt, behaviours_file=fbehaviours, sounds_file=fsounds
+        system_prompt=prompt, expressions=Expressions
     )
     Receiver.start()
 
@@ -231,6 +235,10 @@ def main():
 
     socket_client = SocketClient('ec2-3-104-1-96.ap-southeast-2.compute.amazonaws.com', 3456)
     socket_client.start()
+
+    # memory.raiseEvent("Say", "**audio=quickbells**")
+    # memory.raiseEvent("Say", "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red \\\\pau=1000\\\\ ^wait(you)")
+    # memory.raiseEvent("Say", "^run(helicopter) $EyeColour=red $Sound=get_to_the_choppa $EyeColour=red")
 
     try:
         while True:

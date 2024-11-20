@@ -18,10 +18,17 @@
         ]
     },
     {
-        "audio_description": "plays single bell noise", 
-        "audio_key": "singlebell", 
+        "audio_description": "plays i'll be back by arnold schwarzenegger", 
+        "audio_key": "ill_be_back", 
         "audio_variations": [
-            "/data/home/nao/pepperchat/media/single_bell.wav"
+            "/data/home/nao/pepperchat/media/ill-be-back.wav"
+        ]
+    },
+    {
+        "audio_description": "plays get to the choppa by arnold schwarzenegger", 
+        "audio_key": "get_to_the_choppa", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/get-to-the-choppa.wav"
         ]
     }
 ]

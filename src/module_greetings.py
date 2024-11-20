@@ -13,9 +13,9 @@ class GreetingsModule(ALModule):
         self.memory.subscribeToEvent("FaceDetected", name, "on_face_detected")
         self.memory.subscribeToEvent("ControlGreetings", name, "on_control_greetings")
         self.memory.subscribeToEvent("GreetingsRequireFaceLost", name, "on_greetings_require_face_lost")
-        self.SPEAK_TIMEOUT = 8 # seconds to wait before speaking again
+        self.SPEAK_TIMEOUT = 3 # seconds to wait before speaking again
         self.FACE_LOST_TIMEOUT = 1 # seconds until face is considered lost
-        self.enabled_greetings = True
+        self.enabled_greetings = False
         self.last_spoken_time = 0
         self.has_been_greeted = False
         self.require_face_lost = False

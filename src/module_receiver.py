@@ -16,7 +16,8 @@ class BaseSpeechReceiverModule(ALModule):
     def __init__( 
             self, strModuleName, strNaoIp, port, 
             server_url, base_route, api_key, 
-            model_name, save_csv=False, system_prompt='', behaviours_file='behaviours_described.json', sounds_file='sounds_described.json'
+            model_name, save_csv=False, system_prompt='', behaviours_file='behaviours_described.json', sounds_file='sounds_described.json',
+            expressions=None
         ):
         
         ALModule.__init__(self, strModuleName )
@@ -27,6 +28,8 @@ class BaseSpeechReceiverModule(ALModule):
 
         self.port = port
         self.strNaoIp = strNaoIp
+        
+        self.expressions = expressions
 
         self.response_finished = True
 
@@ -63,7 +66,6 @@ class BaseSpeechReceiverModule(ALModule):
                 f.close()
 
         print("DEBUG: Initializing BehaviourExecutor with behaviour_file: {}".format(behaviours_file))
-        self.executor = BehaviourExecutor(behaviours_file, sounds_file, strNaoIp, port)
 
         TESTING_BEHAVIOURS = False
 
@@ -71,9 +73,9 @@ class BaseSpeechReceiverModule(ALModule):
             index = 0
             previous_description = "<NO DESCRIPTION>"
             while index != -1:
-                animation_test, index = self.executor.get_next_behaviour(index, previous_description)
+                animation_test, index = self.expressions.get_next_behaviour(index, previous_description)
                 if animation_test:
-                    animation_test = str(self.executor.sanitize_behaviour_requests(animation_test)[0])
+                    animation_test = str(self.expressions.sanitize_behaviour_requests(animation_test)[0])
                     print("DEBUG: Running test behaviour: {}".format(animation_test))
                     self.speech.say(animation_test)
                     
@@ -184,7 +186,7 @@ class BaseSpeechReceiverModule(ALModule):
             # We are listening. We should start running "listening" behaviours
             self.listening = True
             self.stop_listening_thread = threading.Event()
-            self.listening_thread = threading.Thread(target=self.run_listening_behaviours, args=(self.stop_listening_thread, self.executor, self.speech))
+            self.listening_thread = threading.Thread(target=self.run_listening_behaviours, args=(self.stop_listening_thread, self.expressions, self.speech))
             self.listening_thread.start()
         else:
             # We have stopped listening. We should stop running "listening" behaviours
@@ -287,7 +289,7 @@ class BaseSpeechReceiverModule(ALModule):
             if not self.DISABLE_THINKING:
                 # Set the LEDs to blue
                 self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
-                behaviour_thread = threading.Thread(target=think_about_response, args=(self.executor, self.speech))
+                behaviour_thread = threading.Thread(target=think_about_response, args=(self.expressions, self.speech))
                 behaviour_thread.start()
 
                 eyes_thread = threading.Thread(target=eyes_thinking_about_response)
@@ -358,7 +360,7 @@ class BaseSpeechReceiverModule(ALModule):
                 # If we want to respond, only respond if we have a chat_response
                 elif chat_response:
                     # Sanitize the chat_response to replace behaviour requests with full paths
-                    chat_response, behaviour_triggered, spoken_response = self.executor.sanitize_request(chat_response)
+                    chat_response, behaviour_triggered, spoken_response = self.expressions.sanitize_request(chat_response)
                     resp_message = chat_response
                 
                 else:

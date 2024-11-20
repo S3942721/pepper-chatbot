@@ -1,15 +1,25 @@
-# -*- coding: utf-8 -*-
 import json
 import random
 import re
-from naoqi import ALProxy
+from naoqi import ALProxy, ALModule
 
-class BehaviourExecutor:
-    def __init__(self, behaviours_file, sounds_file, nao_ip, nao_port):
+class BehaviourExecutor(ALModule):
+    def __init__(self, name, behaviours_file, sounds_file, nao_ip, nao_port):
+        ALModule.__init__(self, name)
+        self.BIND_PYTHON(self.getName(), "callback")
+
         self.behaviours_file = behaviours_file
         self.sounds_file = sounds_file
         self.nao_ip = nao_ip
         self.nao_port = nao_port
+        
+        self.memory = ALProxy("ALMemory", self.nao_ip, self.nao_port)
+        
+        self.memory.subscribeToEvent("Sound", name, "on_play_sound")
+        self.memory.subscribeToEvent("EyeColour", name, "on_eye_colour")
+        self.memory.subscribeToEvent("EyeColourHold", name, "on_eye_colour_hold")
+        
+        self.led_service = ALProxy('ALLeds')
         
         with open(self.behaviours_file, 'r') as file:
             self.behaviours = json.load(file)
@@ -18,14 +28,6 @@ class BehaviourExecutor:
             self.sounds = json.load(file)
 
     def sanitize_behaviour_requests(self, chat_response):
-        """
-        Replace behaviour request keywords with full animation paths
-        
-        Finds the keywords in braces that are after the 'start', 'wait', 'stop', and 'run' keywords and replaces them with the full path to the animation.
-        
-        Example:
-            "^start(hey) Goodbye ^wait(hey)” will become "^start(animations/Stand/Gestures/Hey_4) Goodbye ^wait(animations/Stand/Gestures/Hey_4)"
-        """
         keyword_to_behaviour = {}
         behaviour_triggered = [False]
 
@@ -46,14 +48,43 @@ class BehaviourExecutor:
         spoken_response = re.sub(r'\^(start|wait|stop|run)\([^\)]*\)', '', chat_response).strip()
         return sanitized_response, behaviour_triggered[0], spoken_response
 
+    def on_eye_colour_hold(self, _, value):
+        self.set_eye_colour(value)
+
+    def on_eye_colour(self, _, value):
+        self.set_eye_colour(value)
+        self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "reset_eye_colour")
+        self.memory.subscribeToEvent("StopSpeech", self.getName(), "reset_eye_colour")
+
+    def set_eye_colour(self, colour):
+        if '0x' in colour:
+            self.led_service.fadeRGB("FaceLeds", colour, 0.5)
+
+        # Value is a string like "blue", so we need to convert it to the hex value
+        else:
+            colour = colour.lower()
+            case = {
+                "red": 0xff0000,
+                "green": 0x00ff00,
+                "blue": 0x0000ff,
+                "yellow": 0xffff00,
+                "cyan": 0x00ffff,
+                "magenta": 0xff00ff,
+                "white": 0xffffff,
+                "black": 0x000000
+            }
+            self.led_service.fadeRGB("FaceLeds", case.get(colour, 0x000000), 0.5)
+
+    def reset_eye_colour(self, _, __):
+        self.memory.unsubscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName())
+        self.memory.unsubscribeToEvent("StopSpeech", self.getName())
+        self.led_service.fadeRGB("FaceLeds", 0x000000, 0.5)
+
+    def on_play_sound(self, _, value):
+        if value:
+            self.play_sound(value)
+
     def play_sound(self, sound_key):
-        """
-        Play a sound based on the sound key
-        
-        The sound key is used to find the corresponding sound in the sounds JSON file.
-        The sound is selected randomly from the available variations.
-        The full path to the audio file is returned.
-        """
         sound = next((s for s in self.sounds if s['audio_key'] == sound_key), None)
         if sound:
             selected_sound = random.choice(sound['audio_variations'])
@@ -70,14 +101,6 @@ class BehaviourExecutor:
         return
 
     def sanitize_sound_requests(self, chat_response, play_sound=True):
-        """
-        Play sound requests and remove them from the chat response.
-        
-        Finds the keywords in braces that are after the 'audio' keyword, plays the corresponding sound, and removes the sound request from the response.
-        
-        Example:
-            ".. other text .. **audio=multiplebells** .. other text.." will become ".. other text .. .. other text.."
-        """
         def replace_keyword(match):
             keyword = match.group(1)
             if play_sound:
@@ -88,11 +111,6 @@ class BehaviourExecutor:
         return sanitized_response
 
     def sanitize_request(self, chat_response):
-        """
-        Sanitize both behaviour and sound requests in the chat response.
-        
-        Combines the functionality of sanitize_behaviour_requests and sanitize_sound_requests.
-        """
         print("Received chat response: {}".format(chat_response))
         
         sanitized_response, behaviour_triggered, spoken_response = self.sanitize_behaviour_requests(chat_response)
@@ -103,13 +121,6 @@ class BehaviourExecutor:
         return sanitized_response, behaviour_triggered, spoken_response
 
     def execute_behaviour(self, behaviour_key):
-        """
-        Execute a behaviour based on the behaviour key
-        
-        The behaviour key is used to find the corresponding behaviour in the behaviours JSON file.
-        The behaviour is selected randomly from the available variations.
-        The full path to the animation is returned.
-        """
         behaviour = next((b for b in self.behaviours if b['behaviour_key'] == behaviour_key), None)
         if behaviour:
             selected_behaviour = random.choice(behaviour['behaviour_variations'])
@@ -129,27 +140,10 @@ class BehaviourExecutor:
         return None
     
     def execute_random_behaviour(self, behaviour_keys):
-        """
-        Execute a behaviour based on multiple behaviour keys. It will pick a single random behaviour from the list of keys.
-        
-        The behaviour key is used to find the corresponding behaviour in the behaviours JSON file.
-        The behaviour is selected randomly from the available variations.
-        The full path to the animation is returned.
-        """
-        self.execute_behaviour(random.choice(behaviour_keys), self.nao_ip, self.nao_port)
+        self.execute_behaviour(random.choice(behaviour_keys))
         
     def get_next_behaviour(self, index=0, previous_bhv_description="<NO DESCRIPTION>"):
-        """
-        Get the next behaviour in the sequence based on the previous one.
-        
-        This function will also update the description of the previous behaviour in the JSON file.
-        
-        Returns the next behaviour command and the next index.
-        """
         def update_behaviour_description(current_index, description):
-            """
-            Update the description of the behaviour at the given index.
-            """
             if 0 <= current_index < len(self.behaviours):
                 current_description = self.behaviours[current_index].get('action_description', "<NO DESCRIPTION>")
                 if current_description == "<NO DESCRIPTION>" or description != "<NO DESCRIPTION>":
