@@ -19,6 +19,7 @@ load_env()
 NAO_IP = os.getenv('NAO_IP') or "localhost"
 NAO_PORT = toint(os.getenv('NAO_PORT')) or 9559
 DEFAULT_VOLUME = toint(os.getenv('DEFAULT_VOLUME')) or 50
+DEFAULT_WELCOME = os.getenv('DEFAULT_WELCOME') or "False"
 
 # server
 URL = os.getenv('URL')
@@ -96,6 +97,7 @@ def main():
         model_name=MODEL_NAME,
         save_csv=False,
         prompt='',
+        welcome=DEFAULT_WELCOME,
         fprompt='',
         fbehaviours='/home/nao/pepperchat/behaviours/behaviours_described.json',
         fsounds='/home/nao/pepperchat/media/sounds_described.json',
