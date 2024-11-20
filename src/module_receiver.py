@@ -42,6 +42,10 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("Listening", self.getName(), "handle_listening")
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
         self.memory.subscribeToEvent("TriggerGapFill", self.getName(), "trigger_gap_fill")
+        self.memory.subscribeToEvent("StopSpeech", self.getName(), "stop_speech")
+        self.memory.subscribeToEvent("StopAction", self.getName(), "stop_all")
+        self.memory.subscribeToEvent("StopBehaviour", self.getName(), "stop_behaviour")
+        self.memory.subscribeToEvent("StopAudio", self.getName(), "stop_audio")
 
         self.messages = []
         self.messages_to_llm = []
@@ -96,6 +100,39 @@ class BaseSpeechReceiverModule(ALModule):
 
     def sync_messages(self):
         self.memory.raiseEvent("SyncMessages", json.dumps(self.messages))
+
+    def stop_speech(self, _, value):
+        print("DEBUG: Stop speech event received")
+        threading.Thread(target=self._stop_speech, args=(_, value)).start()
+
+    def _stop_speech(self, _, value):
+        tts = ALProxy("ALTextToSpeech")
+        tts.stopAll()
+        self.clear_all(_, value)
+
+    def stop_behaviour(self, _, value):
+        print("DEBUG: Stop behaviour event received")
+        threading.Thread(target=self._stop_behaviour, args=(_, value)).start()
+
+    def _stop_behaviour(self, _, value):
+        self.memory.raiseEvent("RunningBehaviour", False)
+        bhv_manager = ALProxy("ALBehaviorManager")
+        bhv_manager.stopAllBehaviors()
+
+    def stop_audio(self, _, value):
+        print("DEBUG: Stop audio event received")
+        threading.Thread(target=self._stop_audio, args=(_, value)).start()
+
+    def _stop_audio(self, _, value):
+        self.memory.raiseEvent("RunningBehaviour", False)
+        audio_player = ALProxy("ALAudioPlayer")
+        audio_player.stopAll()
+
+    def stop_all(self, _, value):
+        print("DEBUG: Stop all event received")
+        self.stop_speech(_, value)
+        self.stop_behaviour(_, value)
+        self.stop_audio(_, value)
 
     def clear_all(self, _, value):
         self.reset_message()

@@ -181,6 +181,12 @@ def main():
     memory.declareEvent("Say")
     memory.declareEvent("JSONSay")
     memory.declareEvent("ControlGreetings")
+    memory.declareEvent("GreetingsRequireFaceLost")
+    memory.declareEvent("StopSpeech")
+    memory.declareEvent("StopAction")
+    memory.declareEvent("StopAll")
+    memory.declareEvent("StopBehaviour")
+    memory.declareEvent("StopAudio")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
