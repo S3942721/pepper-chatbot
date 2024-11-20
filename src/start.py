@@ -69,6 +69,9 @@ def main():
     parser.add_option("--prompt",
         help="Add a system prompt",
         dest="prompt")
+    parser.add_option("--welcome",
+        help="Enable the welcome message",
+        dest="welcome")
     parser.add_option("--fprompt",
         help="Add a system prompt load from a file, specify the file name to . If --prompt is specified, ignore this",
         dest="fprompt")
@@ -204,9 +207,6 @@ def main():
 
     global EyeContact
     EyeContact = EyeContactModule("EyeContact")
-    
-    global Greetings
-    Greetings = GreetingsModule("Greetings")
 
     # auto-detection
     # SpeechRecognition.setHoldTime(tofloat(os.getenv('HOLD_TIME')) or 2.0)
@@ -228,6 +228,12 @@ def main():
         system_prompt=prompt, expressions=Expressions
     )
     Receiver.start()
+    
+    global Greetings
+    Greetings = GreetingsModule("Greetings")
+    
+    if opts.welcome == "True":
+        Greetings.on_control_greetings(value=True)
 
     # if webview:
     global HealthyCheck

@@ -56,7 +56,7 @@ class GreetingsModule(ALModule):
         print("INF: GreetingsModule.__del__: cleaning everything")
         self.stop()
         
-    def on_control_greetings(self, event_name, value):
+    def on_control_greetings(self, event_name = None, value = False):
         self.enabled_greetings = value
         print("INF: GreetingsModule: Greetings are", "ON" if value else "OFF")
 

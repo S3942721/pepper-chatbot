@@ -1,14 +1,15 @@
 import os
 import sys
 import subprocess
+import glob
 
 # Constants
 DEFAULT_IP = "192.168.1.100"
 REMOTE_USER = "nao"
 REMOTE_FOLDER = "/home/nao/pepperchat"
 LOCAL_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
-HTML_FILE = os.path.join(os.path.dirname(LOCAL_FOLDER), "chatbot.html")
-HTML_REMOTE_PATH = "~/.local/share/PackageManager/apps/rmit-race/html/chatbot.html"
+HTML_FILES = glob.glob(os.path.join(os.path.dirname(LOCAL_FOLDER), "*.html"))
+HTML_REMOTE_PATH = "~/.local/share/PackageManager/apps/rmit-race/html"
 PASSWORD_FILE = os.path.join(os.path.dirname(LOCAL_FOLDER), ".pepper_password")
 REMOTE_JSON_FILE = "pepperchat/behaviours/behaviours_described.json"
 LOCAL_JSON_FILE = os.path.join(LOCAL_FOLDER, "robot_behaviours_described.json")
@@ -45,14 +46,15 @@ def sync_files(remote_ip, sync_html):
     if sync_html:
         try:
             # Create the remote directory if it does not exist
-            create_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p ~/.local/share/PackageManager/apps/rmit-race/html'"
+            create_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p {HTML_REMOTE_PATH}'"
             run_command(create_dir_command)
 
-            # Copy the chatbot.html file to the remote system
-            html_copy_command = f"sshpass -f {PASSWORD_FILE} scp {HTML_FILE} {REMOTE_USER}@{remote_ip}:{HTML_REMOTE_PATH}"
-            run_command(html_copy_command)
+            # Copy all .html files to the remote system
+            for html_file in HTML_FILES:
+                html_copy_command = f"sshpass -f {PASSWORD_FILE} scp {html_file} {REMOTE_USER}@{remote_ip}:{HTML_REMOTE_PATH}"
+                run_command(html_copy_command)
         except Exception as e:
-            print(f"Failed to copy HTML file: {e}")
+            print(f"Failed to copy HTML files: {e}")
 
     try:
         # Create the remote media directory if it does not exist
