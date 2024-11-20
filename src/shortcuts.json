@@ -11,6 +11,10 @@
         "**audio=multiplebells**",
         "**audio=multiplebells** ^run(hey)"
     ],
+    "🔔🎶": [
+        "**audio=calm_bell**",
+        "**audio=calm_bell** ^run(hey)"
+    ],
     "🤔": [
         "^start(thinking) Hmm let me think about that ^wait(thinking)",
         "^start(thinking) Hmm let me think ^wait(thinking)",
@@ -76,12 +80,12 @@
         "^start(hey) \\rspd=90\\ I'm Pepper, nice to see you ^wait(hey)"
     ],
     "15m left": [
-        "**audio=multiplebells** 15 minutes left of this session",
-        "**audio=multiplebells** 15 minutes left everyone",
-        "**audio=multiplebells** 15 minutes left",
-        "**audio=multiplebells** ^start(hey) 15 minutes left of this session ^wait(hey)",
-        "**audio=multiplebells** ^start(hey) 15 minutes left everyone ^wait(hey)",
-        "**audio=multiplebells** ^start(hey) 15 minutes left ^wait(hey)"
+        "**audio=calm_bell** Hey everyone 15 minutes left of this session",
+        "**audio=calm_bell** 15 minutes left everyone",
+        "**audio=calm_bell** Just letting you know there is 15 minutes left",
+        "**audio=calm_bell** ^start(hey) 15 minutes left of this session ^wait(hey)",
+        "**audio=calm_bell** ^start(hey) 15 minutes left everyone ^wait(hey)",
+        "**audio=calm_bell** ^start(hey) 15 minutes left ^wait(hey)"
     ],
     "30s left": [
         "**audio=singlebell** time to wrap up",
@@ -109,10 +113,17 @@
     "Loveyou":"^run(loveyou)",
     "Eye Broke":"^run(knockeye)",
     "Laugh":"^run(laugh)",
+    "🥁": "$Sound=badoom_tss ^start(bandmaster) \\pau=3000\\",
+    "🦗": "$Sound=crickets ^run(thinking)",
     "🐺": "^run(monster)",
     "🪄": "^run(mysticalpower)",
+    "😵": "$Sound=error",
+    "⚠️🎉": "$Sound=yippee",
+    "⚠️VineBoom": "$Sound=vine_boom",
+    "⚠️🎺WompWomp": "$Sound=womp_womp",
+    "⚠️SadMeowSong": "$Sound=sad_meow_song",
     "Strike a pose":"^run(strikeapose)",
     "I'll be back": "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red ^wait(you) \\pau=1000\\",
     "Get to choppa": "^start(helicopter) Oh my, what's that. \\pau=1000\\ $EyeColour=red $Sound=get_to_the_choppa $EyeColour=red ^wait(helicopter)",
-    "🛑": "$StopAction=None"
+    "🛑STOP🛑": "$StopAction=None"
 }
