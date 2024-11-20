@@ -5,10 +5,17 @@ import re
 from naoqi import ALProxy
 
 class BehaviourExecutor:
-    def __init__(self, behaviours_file):
+    def __init__(self, behaviours_file, sounds_file, nao_ip, nao_port):
         self.behaviours_file = behaviours_file
+        self.sounds_file = sounds_file
+        self.nao_ip = nao_ip
+        self.nao_port = nao_port
+        
         with open(self.behaviours_file, 'r') as file:
             self.behaviours = json.load(file)
+        
+        with open(self.sounds_file, 'r') as file:
+            self.sounds = json.load(file)
 
     def sanitize_behaviour_requests(self, chat_response):
         """
@@ -19,39 +26,83 @@ class BehaviourExecutor:
         Example:
             "^start(hey) Goodbye ^wait(hey)” will become "^start(animations/Stand/Gestures/Hey_4) Goodbye ^wait(animations/Stand/Gestures/Hey_4)"
         """
-        # print("Sanitizing chat response: '{}'".format(chat_response))
-        # Dictionary to store the mapping of keywords to selected behaviours
         keyword_to_behaviour = {}
-        behaviour_triggered = [False]  # Use a list to allow modification in nested function
+        behaviour_triggered = [False]
 
-        # Function to replace keywords with full animation paths
         def replace_keyword(match):
             keyword = match.group(2)
 
             if keyword not in keyword_to_behaviour:
-                # Search for the behaviour key in the behaviours
                 behaviour = next((b for b in self.behaviours if b['behaviour_key'] == keyword), None)
                 if behaviour:
                     selected_behaviour = random.choice(behaviour['behaviour_variations'])
                     keyword_to_behaviour[keyword] = selected_behaviour
-                    # print("Keyword '{}' mapped to behaviour: {}".format(keyword, selected_behaviour))
                     behaviour_triggered[0] = True
                 else:
-                    # print("No behaviour found for keyword: '{}'".format(keyword))
-                    return match.group(0)  # Return the original match if no behaviour is found
+                    return match.group(0)
             return "^{}({})".format(match.group(1), keyword_to_behaviour[keyword])
 
-        # Replace all occurrences of the keywords in the chat response
         sanitized_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, chat_response)
-        
-        # Remove behaviour actions to create spoken response
         spoken_response = re.sub(r'\^(start|wait|stop|run)\([^\)]*\)', '', chat_response).strip()
-        
-        # print("Sanitized chat response: '{}'".format(sanitized_response))
-        # print("Spoken response: '{}'".format(spoken_response))
         return sanitized_response, behaviour_triggered[0], spoken_response
 
-    def execute_behaviour(self, behaviour_key, nao_ip, nao_port):
+    def play_sound(self, sound_key):
+        """
+        Play a sound based on the sound key
+        
+        The sound key is used to find the corresponding sound in the sounds JSON file.
+        The sound is selected randomly from the available variations.
+        The full path to the audio file is returned.
+        """
+        sound = next((s for s in self.sounds if s['audio_key'] == sound_key), None)
+        if sound:
+            selected_sound = random.choice(sound['audio_variations'])
+            print("Playing sound: {}".format(selected_sound))
+            
+            try:
+                audio_player_service = ALProxy("ALAudioPlayer", self.nao_ip, self.nao_port)
+                audio_player_service.playFile(str(selected_sound), 1.0, 0.0)
+                return selected_sound
+            except Exception as e:
+                print("Error playing sound: {}".format(e))
+        else:
+            print("No sound found for key: '{}'".format(sound_key))
+        return
+
+    def sanitize_sound_requests(self, chat_response, play_sound=True):
+        """
+        Play sound requests and remove them from the chat response.
+        
+        Finds the keywords in braces that are after the 'audio' keyword, plays the corresponding sound, and removes the sound request from the response.
+        
+        Example:
+            ".. other text .. **audio=multiplebells** .. other text.." will become ".. other text .. .. other text.."
+        """
+        def replace_keyword(match):
+            keyword = match.group(1)
+            if play_sound:
+                self.play_sound(keyword)
+            return ''
+
+        sanitized_response = re.sub(r'\*\*audio=(.*?)\*\*', replace_keyword, chat_response)
+        return sanitized_response
+
+    def sanitize_request(self, chat_response):
+        """
+        Sanitize both behaviour and sound requests in the chat response.
+        
+        Combines the functionality of sanitize_behaviour_requests and sanitize_sound_requests.
+        """
+        print("Received chat response: {}".format(chat_response))
+        
+        sanitized_response, behaviour_triggered, spoken_response = self.sanitize_behaviour_requests(chat_response)
+        sanitized_response = self.sanitize_sound_requests(sanitized_response)
+        spoken_response = self.sanitize_sound_requests(spoken_response, play_sound=False)
+        print("Sanitized response: {}".format(sanitized_response))
+        print("Spoken response: {}".format(spoken_response))
+        return sanitized_response, behaviour_triggered, spoken_response
+
+    def execute_behaviour(self, behaviour_key):
         """
         Execute a behaviour based on the behaviour key
         
@@ -59,19 +110,16 @@ class BehaviourExecutor:
         The behaviour is selected randomly from the available variations.
         The full path to the animation is returned.
         """
-
         behaviour = next((b for b in self.behaviours if b['behaviour_key'] == behaviour_key), None)
         if behaviour:
             selected_behaviour = random.choice(behaviour['behaviour_variations'])
             print("Executing behaviour: {}".format(selected_behaviour))
             
-            # Convert selected_behaviour to string if it is not
             if not isinstance(selected_behaviour, str):
                 selected_behaviour = str(selected_behaviour)
 
-            # Execute the behaviour using ALBehaviorManager
             try:
-                animation_player_service = ALProxy("ALAnimationPlayer", nao_ip, nao_port)
+                animation_player_service = ALProxy("ALAnimationPlayer", self.nao_ip, self.nao_port)
                 animation_player_service.run(selected_behaviour, _async=True)
                 return selected_behaviour
             except Exception as e:
@@ -80,7 +128,7 @@ class BehaviourExecutor:
             print("No behaviour found for key: '{}'".format(behaviour_key))
         return None
     
-    def execute_random_behaviour(self, behaviour_keys, nao_ip, nao_port):
+    def execute_random_behaviour(self, behaviour_keys):
         """
         Execute a behaviour based on multiple behaviour keys. It will pick a single random behaviour from the list of keys.
         
@@ -88,14 +136,8 @@ class BehaviourExecutor:
         The behaviour is selected randomly from the available variations.
         The full path to the animation is returned.
         """
-        self.execute_behaviour(random.choice(behaviour_keys), nao_ip, nao_port)
+        self.execute_behaviour(random.choice(behaviour_keys), self.nao_ip, self.nao_port)
         
-        
-# Example usage:
-# executor = BehaviourExecutor('/path/to/behaviours.json')
-# sanitized_response, behaviour_triggered = executor.sanitize_behaviour_requests("^start(hey) Goodbye ^wait(hey)")
-# print(sanitized_response, behaviour_triggered)
-# >> ^start(animations/Stand/Gestures/Hey_4) Goodbye ^wait(animations/Stand/Gestures/Hey_4) True
     def get_next_behaviour(self, index=0, previous_bhv_description="<NO DESCRIPTION>"):
         """
         Get the next behaviour in the sequence based on the previous one.
@@ -116,11 +158,9 @@ class BehaviourExecutor:
                         json.dump(self.behaviours, file, indent=4)
                     print("Updated behaviour at index {} with description: {}".format(current_index, description))
 
-        # Update the description of the previous behaviour if it was actually run
         if index > 0 and self.behaviours[index - 1].get('action_description', "<NO DESCRIPTION>") == "<NO DESCRIPTION>":
             update_behaviour_description(index - 1, previous_bhv_description)
 
-        # Find the next behaviour without a description
         while index < len(self.behaviours):
             behaviour = self.behaviours[index]
             if behaviour.get('action_description', "<NO DESCRIPTION>") == "<NO DESCRIPTION>":

@@ -16,7 +16,7 @@ class BaseSpeechReceiverModule(ALModule):
     def __init__( 
             self, strModuleName, strNaoIp, port, 
             server_url, base_route, api_key, 
-            model_name, save_csv=False, system_prompt='', behavior_file='behaviours_described.json'
+            model_name, save_csv=False, system_prompt='', behaviours_file='behaviours_described.json', sounds_file='sounds_described.json'
         ):
         
         ALModule.__init__(self, strModuleName )
@@ -27,8 +27,6 @@ class BaseSpeechReceiverModule(ALModule):
 
         self.port = port
         self.strNaoIp = strNaoIp
-
-        self.behaviour_file = behavior_file
 
         self.response_finished = True
 
@@ -60,8 +58,8 @@ class BaseSpeechReceiverModule(ALModule):
                 f.write('role,content\n')
                 f.close()
 
-        print("DEBUG: Initializing BehaviourExecutor with behaviour_file: {}".format(self.behaviour_file))
-        self.executor = BehaviourExecutor(self.behaviour_file)
+        print("DEBUG: Initializing BehaviourExecutor with behaviour_file: {}".format(behaviours_file))
+        self.executor = BehaviourExecutor(behaviours_file, sounds_file, strNaoIp, port)
 
         TESTING_BEHAVIOURS = False
 
@@ -323,7 +321,7 @@ class BaseSpeechReceiverModule(ALModule):
                 # If we want to respond, only respond if we have a chat_response
                 elif chat_response:
                     # Sanitize the chat_response to replace behaviour requests with full paths
-                    chat_response, behaviour_triggered, spoken_response = self.executor.sanitize_behaviour_requests(chat_response)
+                    chat_response, behaviour_triggered, spoken_response = self.executor.sanitize_request(chat_response)
                     resp_message = chat_response
                 
                 else:

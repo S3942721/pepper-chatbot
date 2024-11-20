@@ -1,0 +1,27 @@
+[
+    {
+        "audio_description": "plays multiple bell noises", 
+        "audio_key": "multiplebells", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/multi_bell_1.wav",
+            "/data/home/nao/pepperchat/media/multi_bell_2.wav"
+        ]
+    },
+    {
+        "audio_description": "plays quick bell noises", 
+        "audio_key": "quickbells", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/quick_bell_1.wav",
+            "/data/home/nao/pepperchat/media/quick_bell_2.wav",
+            "/data/home/nao/pepperchat/media/quick_bell_3.wav",
+            "/data/home/nao/pepperchat/media/quick_bell_4.wav"
+        ]
+    },
+    {
+        "audio_description": "plays single bell noise", 
+        "audio_key": "singlebell", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/single_bell.wav"
+        ]
+    }
+]

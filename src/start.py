@@ -74,6 +74,9 @@ def main():
     parser.add_option("--fbehaviours",
         help="Add a system behaviour json file, specify the file name.",
         dest="fbehaviours")
+    parser.add_option("--fsounds",
+        help="Add a system sounds json file, specify the file name.",
+        dest="fsounds")
     parser.add_option("--webview",
         help="Start a webview server when this script starts. Speficy the url of webview.",
         dest="webview")
@@ -91,6 +94,7 @@ def main():
         prompt='',
         fprompt='',
         fbehaviours='/home/nao/pepperchat/behaviours/behaviours_described.json',
+        fsounds='/home/nao/pepperchat/media/sounds_described.json',
         webview=WEBVIEW
     )
 
@@ -109,6 +113,7 @@ def main():
     prompt=opts.prompt
     fprompt=opts.fprompt
     fbehaviours=opts.fbehaviours
+    fsounds=opts.fsounds
     webview = opts.webview
 
     # if not server_url:
@@ -210,7 +215,7 @@ def main():
         "Receiver", ip, port,
         server_url=server_url, base_route=chat_route,
         api_key=api_key, model_name=model_name, save_csv=save_csv,
-        system_prompt=prompt, behavior_file=fbehaviours
+        system_prompt=prompt, behaviours_file=fbehaviours, sounds_file=fsounds
     )
     Receiver.start()
 

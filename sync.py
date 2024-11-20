@@ -14,7 +14,7 @@ REMOTE_JSON_FILE = "pepperchat/behaviours/behaviours_described.json"
 LOCAL_JSON_FILE = os.path.join(LOCAL_FOLDER, "robot_behaviours_described.json")
 REMOTE_EXPLORER_FOLDER = "~/.local/share/Explorer"
 LOCAL_EXPLORER_FOLDER = os.path.join(os.path.dirname(LOCAL_FOLDER), "explorer")
-LOCAL_MEDIA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "media")
+LOCAL_MEDIA_FOLDER = os.path.join(os.path.dirname(LOCAL_FOLDER), "src/media")
 REMOTE_MEDIA_FOLDER = os.path.join(REMOTE_FOLDER, "media")
 
 def run_command(command):
@@ -55,6 +55,10 @@ def sync_files(remote_ip, sync_html):
             print(f"Failed to copy HTML file: {e}")
 
     try:
+        # Create the remote media directory if it does not exist
+        create_media_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p {REMOTE_MEDIA_FOLDER}'"
+        run_command(create_media_dir_command)
+
         # Copy the local media folder to the remote system
         media_copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_MEDIA_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_MEDIA_FOLDER}"
         run_command(media_copy_command)
