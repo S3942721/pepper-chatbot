@@ -237,7 +237,7 @@ def main():
     socket_client.start()
 
     # memory.raiseEvent("Say", "**audio=quickbells**")
-    # memory.raiseEvent("Say", "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red \\\\pau=1000\\\\ ^wait(you)")
+    # memory.raiseEvent("Say", "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red ^wait(you) \\\\pau=1000\\\\")
     # memory.raiseEvent("Say", "^run(helicopter) $EyeColour=red $Sound=get_to_the_choppa $EyeColour=red")
 
     try:
