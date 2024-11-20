@@ -49,6 +49,8 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("StopAction", self.getName(), "stop_all")
         self.memory.subscribeToEvent("StopBehaviour", self.getName(), "stop_behaviour")
         self.memory.subscribeToEvent("StopAudio", self.getName(), "stop_audio")
+        self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "clear_display")
+        self.memory.subscribeToEvent("PepperMessage", self.getName(), "pepper_message")
 
         self.messages = []
         self.messages_to_llm = []
@@ -103,6 +105,13 @@ class BaseSpeechReceiverModule(ALModule):
     def sync_messages(self):
         self.memory.raiseEvent("SyncMessages", json.dumps(self.messages))
 
+    def pepper_message(self, _, value):
+        print("DEBUG: Pepper message event received with value {}".format(value))     
+
+    def clear_display(self, _, value):
+        print("DEBUG: Clear display event received")
+        self.memory.raiseEvent("PepperMessage", None)
+
     def stop_speech(self, _, value):
         print("DEBUG: Stop speech event received")
         threading.Thread(target=self._stop_speech, args=(_, value)).start()
@@ -132,6 +141,7 @@ class BaseSpeechReceiverModule(ALModule):
 
     def stop_all(self, _, value):
         print("DEBUG: Stop all event received")
+        self.clear_display(_, value)
         self.stop_speech(_, value)
         self.stop_behaviour(_, value)
         self.stop_audio(_, value)
@@ -383,7 +393,7 @@ class BaseSpeechReceiverModule(ALModule):
             self.memory.raiseEvent("ClearSpeechRecognitionBuffer", None)
 
             print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
-            self.memory.raiseEvent("PepperMessage", spoken_response)
+            # self.memory.raiseEvent("PepperMessage", spoken_response)
             self.memory.raiseEvent("RunningBehaviour", True)
             self.speech.say(resp_message)
 

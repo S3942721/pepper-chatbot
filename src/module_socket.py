@@ -34,9 +34,10 @@ class SocketClient(threading.Thread):
                 json_data = json.loads(response.decode('utf-8'))
                 if(json_data['type'] == 'script'):
                     msg = str(json_data['message'])
-                    self.memory.raiseEvent("PepperMessage", msg)
-                    self.speech.say(msg)
-                    self.memory.raiseEvent("PepperMessage", None)
+                    if msg:
+                        self.memory.raiseEvent('StopAction', None)
+                        self.memory.raiseEvent('Say', msg)
+
                 elif(json_data['type'] == 'profile'):
                     if('html' in json_data['message']):
                         self.memory.raiseEvent("LoadHTML", "http://198.18.0.1/apps/rmit-race/"+str(json_data['message']['html']))
@@ -47,6 +48,10 @@ class SocketClient(threading.Thread):
                     if('name' in json_data['message'] and 'status' in json_data['message']):
                         if(json_data['message']['name'] == 'Speech Recognition'):
                             self.memory.raiseEvent('ControlRecording', bool(json_data['message']['status']))
+                elif(json_data['type'] == 'shortcut'):
+                    if(json_data['message']):
+                        self.memory.raiseEvent('StopAction', None)
+                        self.memory.raiseEvent('Say', str(json_data['message']))
             except ValueError:
                 data = response.decode('utf-8')
                 print("Received non-JSON response:", data)

@@ -18,6 +18,13 @@
         ]
     },
     {
+        "audio_description": "plays single bell noise", 
+        "audio_key": "singlebell", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/single_bell.wav"
+        ]
+    },
+    {
         "audio_description": "plays i'll be back by arnold schwarzenegger", 
         "audio_key": "ill_be_back", 
         "audio_variations": [
