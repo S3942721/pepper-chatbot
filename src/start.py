@@ -197,6 +197,9 @@ def main():
     memory.declareEvent("ChangeGreetFaceLostTimeout")
     memory.declareEvent("ChangeGreetTimeout")
     memory.declareEvent("ChangeResponseSpeed")
+    memory.declareEvent("ControlContextMovement")
+    memory.declareEvent("ControlAwareness")
+    memory.declareEvent("ControlEngagement")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
