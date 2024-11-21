@@ -44,11 +44,11 @@ class SocketClient(threading.Thread):
                         if('gap_fill' in json_data['message']['flags']):
                             self.memory.raiseEvent("TriggerGapFill", bool(json_data['message']['flags']['gap_fill']))
                 elif(json_data['type'] == 'trigger'):
-                    print("Triggering event: ", json_data['message'])
+                    # print("Triggering event: ", json_data['message'])
                     if('Signal' in json_data['message'] and 'Value' in json_data['message']):
                         signal = str(json_data['message']['Signal'])
                         value = json_data['message']['Value']
-                        print("Signal: ", signal, "Value: ", value)
+                        # print("Signal: ", signal, "Value: ", value)
                         if signal is not None and value is not None:
                             self.memory.raiseEvent(signal, value)
                 elif(json_data['type'] == 'shortcut'):
@@ -59,7 +59,7 @@ class SocketClient(threading.Thread):
                     # Recieved in format {type: "trigger-all", message: [{ Signal, Value }]}
                     for item in json_data['message']:
                         if('Signal' in item and 'Value' in item):
-                            print("Triggering event: ", item)
+                            # print("Triggering event: ", item)
                             self.memory.raiseEvent(str(item['Signal']), item['Value'])
             except ValueError:
                 data = response.decode('utf-8')
