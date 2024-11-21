@@ -13,11 +13,24 @@ class BehaviourExecutor(ALModule):
         self.nao_ip = nao_ip
         self.nao_port = nao_port
         
+        self.mute = False
+        self.current_volume = 80
+        
+        self.DEFAULT_RESPONSE_SPEED = 90
+        self.response_speed = self.DEFAULT_RESPONSE_SPEED
+        self.response_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
+        
         self.memory = ALProxy("ALMemory", self.nao_ip, self.nao_port)
         
         self.memory.subscribeToEvent("Sound", name, "on_play_sound")
         self.memory.subscribeToEvent("EyeColour", name, "on_eye_colour")
         self.memory.subscribeToEvent("EyeColourHold", name, "on_eye_colour_hold")
+        self.memory.subscribeToEvent("Mute", name, "on_mute")
+        self.memory.subscribeToEvent("Volume", name, "volume")
+        self.memory.subscribeToEvent("ChangeResponseSpeed", name, "on_response_speed_change")
+        self.memory.subscribeToEvent("ControlContextMovement", name, "on_control_tracking_mode")
+        self.memory.subscribeToEvent("ControlEngagement", name, "on_control_engagement_mode")
+        self.memory.subscribeToEvent("ControlAwareness", name, "on_control_basic_awareness")
         
         self.led_service = ALProxy('ALLeds')
         
@@ -116,6 +129,8 @@ class BehaviourExecutor(ALModule):
         sanitized_response, behaviour_triggered, spoken_response = self.sanitize_behaviour_requests(chat_response)
         sanitized_response = self.sanitize_sound_requests(sanitized_response)
         spoken_response = self.sanitize_sound_requests(spoken_response, play_sound=False)
+        spoken_response = self.response_string + spoken_response
+        sanitized_response = self.response_string + sanitized_response
         print("Sanitized response: {}".format(sanitized_response))
         print("Spoken response: {}".format(spoken_response))
         return sanitized_response, behaviour_triggered, spoken_response
@@ -164,3 +179,40 @@ class BehaviourExecutor(ALModule):
             index += 1
 
         return None, index
+
+    def volume(self, _, value):
+        self.current_volume = value
+        audio = ALProxy( "ALAudioDevice")
+        audio.setOutputVolume(self.current_volume)
+        print("INF: SpeechRecognitionModule: volume set to %s" % self.current_volume)
+
+    def on_mute(self, _, value):
+        self.mute = value
+        if value:
+            audio = ALProxy( "ALAudioDevice")
+            audio.setOutputVolume(0)
+            print("INF: SpeechRecognitionModule: volume set to 0")
+        else:
+            self.volume(None, self.current_volume)
+
+    def on_response_speed_change(self, event_name, value):
+        self.response_speed = value
+        self.response_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
+        print("INF: GreetingsModule: Response speed changed to", value)
+        
+    def on_control_basic_awareness(self, event_name, value):
+        print("Control basic awareness: {}".format(value))
+        aba = ALProxy("ALBasicAwareness")
+        aba.setEnabled(value)
+    
+    def on_control_engagement_mode(self, event_name, value):
+        aba = ALProxy("ALBasicAwareness")
+        mode = "FullyEngaged" if value else "Unengaged"
+        print("Control engagement mode: {}".format(mode))
+        aba.setEngagementMode(mode)
+
+    def on_control_tracking_mode(self, event_name, value):
+        aba = ALProxy("ALBasicAwareness")
+        mode = "MoveContextually" if value else "WholeBody"
+        print("Control tracking mode: {}".format(mode))
+        aba.setTrackingMode(mode)

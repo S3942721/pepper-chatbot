@@ -33,10 +33,10 @@ class EyeContactModule(ALModule):
 
     def handle_status_change(self, status):
         self.face_detected = status
-        print("INF: EyeContactModule: Eye contact is", "ON" if status else "OFF")
+        # print("INF: EyeContactModule: Eye contact is", "ON" if status else "OFF")
         self.memory.raiseEvent('EyeContact', status)
         if not self.face_detected:
-            print("INF: EyeContactModule: Resetting conversation")
+            # print("INF: EyeContactModule: Resetting conversation")
             self.memory.raiseEvent('ResetConversation', True)
 
     def stop(self):

@@ -110,10 +110,10 @@
         "^run(no)",
         "^run(reject)"
     ],
-    "Loveyou":"^run(loveyou)",
+    "Love you":"^run(loveyou)",
     "Eye Broke":"^run(knockeye)",
     "Laugh":"^run(laugh)",
-    "🥁": "$Sound=badoom_tss ^start(bandmaster) \\pau=3000\\",
+    "🥁": "$Sound=badoom_tss ^start(clap) \\pau=3000\\",
     "🦗": "$Sound=crickets ^run(thinking)",
     "🐺": "^run(monster)",
     "🪄": "^run(mysticalpower)",
@@ -121,8 +121,16 @@
     "⚠️🎉": "$Sound=yippee",
     "⚠️VineBoom": "$Sound=vine_boom",
     "⚠️🎺WompWomp": "$Sound=womp_womp",
-    "⚠️SadMeowSong": "$Sound=sad_meow_song",
+    "⚠️SadMeowSong": "$Sound=sad_meow_song ^run(sad)",
     "Strike a pose":"^run(strikeapose)",
+    "Pose for photo":[
+        "^start(strikeapose) Say cheese ^wait(strikeapose)",
+        "^start(strikeapose) Smile ^wait(strikeapose)",
+        "^start(strikeapose) 3, 2, 1, pose ^wait(strikeapose)",
+        "^start(strikeapose) 3, 2, 1, smile ^wait(strikeapose)",
+        "^start(strikeapose) 3, 2, 1, say cheese ^wait(strikeapose)",
+        "^start(strikeapose) 3, 2, 1, pose for the camera ^wait(strikeapose)"
+    ],
     "I'll be back": "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red ^wait(you) \\pau=1000\\",
     "Get to choppa": "^start(helicopter) Oh my, what's that. \\pau=1000\\ $EyeColour=red $Sound=get_to_the_choppa $EyeColour=red ^wait(helicopter)",
     "🛑STOP🛑": "$StopAction=None"

@@ -57,7 +57,7 @@ class HealthyCheckModule(ALModule):
         self.chat_history = value
 
     def update_html_url(self, event_name, value):
-        print(value)
+        print("Loading HTML: {}".format(value))
         self.webview_url = value
         self.tablet_service.showWebview(self.webview_url)
         self.tablet_service.reloadPage(0)

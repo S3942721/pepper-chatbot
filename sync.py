@@ -17,6 +17,8 @@ REMOTE_EXPLORER_FOLDER = "~/.local/share/Explorer"
 LOCAL_EXPLORER_FOLDER = os.path.join(os.path.dirname(LOCAL_FOLDER), "explorer")
 LOCAL_MEDIA_FOLDER = os.path.join(os.path.dirname(LOCAL_FOLDER), "src/media")
 REMOTE_MEDIA_FOLDER = os.path.join(REMOTE_FOLDER, "media")
+LOCAL_HANDS_ABOVE_HEAD_FOLDER = os.path.join(LOCAL_FOLDER, "strikeapose/hands_above_head")
+REMOTE_HANDS_ABOVE_HEAD_FOLDER = "~/.local/share/PackageManager/apps/hands_above_head"
 
 def run_command(command):
     """Run a shell command and print it."""
@@ -27,7 +29,7 @@ def run_command(command):
         sys.exit(result.returncode)
     print(result.stdout)
 
-def sync_files(remote_ip, sync_html):
+def sync_files(remote_ip, sync_html, sync_hands_above_head):
     try:
         """Sync local files to the remote system."""
         # Remove the existing folder on the remote system
@@ -67,20 +69,39 @@ def sync_files(remote_ip, sync_html):
     except Exception as e:
         print(f"Failed to copy media folder: {e}")
 
+    if sync_hands_above_head:
+        try:
+            # Create the remote hands_above_head directory if it does not exist
+            create_hands_above_head_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p {REMOTE_HANDS_ABOVE_HEAD_FOLDER}'"
+            run_command(create_hands_above_head_dir_command)
+
+            # Copy the local hands_above_head folder to the remote system
+            hands_above_head_copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_HANDS_ABOVE_HEAD_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_HANDS_ABOVE_HEAD_FOLDER}"
+            run_command(hands_above_head_copy_command)
+        except Exception as e:
+            print(f"Failed to copy hands_above_head folder: {e}")
+
 def main():
     """Main function to handle command line arguments and initiate file sync."""
     sync_html = False
+    sync_hands_above_head = False
     remote_ip = DEFAULT_IP
 
     for arg in sys.argv[1:]:
         if arg == "-h":
             sync_html = True
+        elif arg == "-b":
+            sync_hands_above_head = True
+        elif arg == "-a":
+            sync_html = True
+            sync_hands_above_head = True
         else:
             remote_ip = arg
 
     print(f"Using remote IP: {remote_ip}")
     print(f"Sync HTML: {sync_html}")
-    sync_files(remote_ip, sync_html)
+    print(f"Sync Hands Above Head: {sync_hands_above_head}")
+    sync_files(remote_ip, sync_html, sync_hands_above_head)
 
 if __name__ == "__main__":
     main()

@@ -12,7 +12,6 @@ class SocketClient(threading.Thread):
         self.connected = False
         self.running = True
 
-        self.speech = ALProxy('ALAnimatedSpeech')
         self.memory = ALProxy("ALMemory")
 
     def connection(self):
@@ -45,13 +44,23 @@ class SocketClient(threading.Thread):
                         if('gap_fill' in json_data['message']['flags']):
                             self.memory.raiseEvent("TriggerGapFill", bool(json_data['message']['flags']['gap_fill']))
                 elif(json_data['type'] == 'trigger'):
-                    if('name' in json_data['message'] and 'status' in json_data['message']):
-                        if(json_data['message']['name'] == 'Speech Recognition'):
-                            self.memory.raiseEvent('ControlRecording', bool(json_data['message']['status']))
+                    print("Triggering event: ", json_data['message'])
+                    if('Signal' in json_data['message'] and 'Value' in json_data['message']):
+                        signal = str(json_data['message']['Signal'])
+                        value = json_data['message']['Value']
+                        print("Signal: ", signal, "Value: ", value)
+                        if signal is not None and value is not None:
+                            self.memory.raiseEvent(signal, value)
                 elif(json_data['type'] == 'shortcut'):
                     if(json_data['message']):
                         self.memory.raiseEvent('StopAction', None)
                         self.memory.raiseEvent('Say', str(json_data['message']))
+                elif(json_data['type'] == 'trigger-all'):
+                    # Recieved in format {type: "trigger-all", message: [{ Signal, Value }]}
+                    for item in json_data['message']:
+                        if('Signal' in item and 'Value' in item):
+                            print("Triggering event: ", item)
+                            self.memory.raiseEvent(str(item['Signal']), item['Value'])
             except ValueError:
                 data = response.decode('utf-8')
                 print("Received non-JSON response:", data)

@@ -164,7 +164,7 @@ def main():
     aba = ALProxy("ALBasicAwareness")
     aba.setEnabled(True)
     aba.setEngagementMode("FullyEngaged") # Unengaged, FullyEngaged, SemiEngaged TODO: tweak this
-    aba.setTrackingMode("MoveContextually") # Head, WholeBody, MoveContextually, BodyRotation TODO: tweak this
+    aba.setTrackingMode("WholeBody") # Head, WholeBody, MoveContextually, BodyRotation TODO: tweak this
     
     # declear events sharing between different modules
     memory = ALProxy("ALMemory")
@@ -193,6 +193,10 @@ def main():
     memory.declareEvent("StopAll")
     memory.declareEvent("StopBehaviour")
     memory.declareEvent("StopAudio")
+    memory.declareEvent("UpdateProfile")
+    memory.declareEvent("ChangeGreetFaceLostTimeout")
+    memory.declareEvent("ChangeGreetTimeout")
+    memory.declareEvent("ChangeResponseSpeed")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
@@ -247,6 +251,8 @@ def main():
     # memory.raiseEvent("Say", "**audio=quickbells**")
     # memory.raiseEvent("Say", "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red ^wait(you) \\\\pau=1000\\\\")
     # memory.raiseEvent("Say", "^run(helicopter) $EyeColour=red $Sound=get_to_the_choppa $EyeColour=red")
+
+    print("I am alive.")
 
     try:
         while True:
