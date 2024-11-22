@@ -33,12 +33,12 @@ class MotionModule(ALModule):
         MaxJerkTheta 	maximum angular jerk (radians/second^3) 	    2.0 	    0.2 	    50.00 	    yes
         """
         self.move_config = {
-            "MaxVelXY": 0.35,
-            "MaxVelTheta": 1.0,
-            "MaxAccXY": 0.3,
-            "MaxAccTheta": 0.75,
-            "MaxJerkXY": 1.0,
-            "MaxJerkTheta": 2.0
+            "MaxVelXY": 0.55,
+            "MaxVelTheta": 2.0,
+            "MaxAccXY": 0.55,
+            "MaxAccTheta": 3.0,
+            "MaxJerkXY": 5.0,
+            "MaxJerkTheta": 50.0
         }
 
         self.motion = ALProxy("ALMotion", self.nao_ip, self.nao_port)
@@ -50,6 +50,12 @@ class MotionModule(ALModule):
         self.memory.subscribeToEvent("ControlTurnSpeed", name, "on_control_turn_speed")
         self.memory.subscribeToEvent("ControlMovementTimeout", name, "on_control_movement_timeout")
         self.memory.subscribeToEvent("ControlMovement", name, "on_control_movement")
+        self.memory.subscribeToEvent("ControlEngagement", name, "on_control_engagement")
+        self.memory.subscribeToEvent("ControlIdlePosition", name, "on_control_idle_position")
+        self.memory.subscribeToEvent("ControlCollisionAvoidance", name, "on_control_collision_avoidance")
+
+        self.current_engagement = True
+        self.previous_engagement = self.current_engagement
 
     def reset_move_timer(self):
         if self.move_timer:
@@ -83,22 +89,29 @@ class MotionModule(ALModule):
                     x += self.movement_speed
                 elif key == "S":
                     x -= self.movement_speed
-                elif key == "D":
-                    y += self.movement_speed
                 elif key == "A":
+                    y += self.movement_speed
+                elif key == "D":
                     y -= self.movement_speed
-                elif key == "E":
-                    theta += self.turn_speed
                 elif key == "Q":
+                    theta += self.turn_speed
+                elif key == "E":
                     theta -= self.turn_speed
                 print("Key {} is being held. Updated movement values to x: {}, y: {}, theta: {}".format(key, x, y, theta))
 
+        if x == 0.0 and y == 0.0 and theta == 0.0:
+            self.stop_moving(None, "MoveTimeout")
+            return
+        self.previous_engagement = self.current_engagement
+        self.memory.raiseEvent("ControlEngagement", False)
         self.motion.move(x, y, theta, self.move_config)
         print("Moving with x: {}, y: {}, theta: {}".format(x, y, theta))
 
     def stop_moving(self, _, value):
         self.motion.stopMove()
         print("Stopped moving")
+        if value == "MoveTimeout":
+            self.memory.raiseEvent("ControlEngagement", self.previous_engagement)
         if self.move_timer:
             print("No message received, stopping movement timer for safety")
             self.move_timer.cancel()
@@ -117,3 +130,21 @@ class MotionModule(ALModule):
         if not self.motion_enabled:
             self.stop_moving(None, None)
         print("Movement enabled set to: {}".format(self.motion_enabled))
+    
+    def on_control_engagement(self, _, value):
+        self.current_engagement = value
+    
+    def on_control_idle_position(self, _, value):
+        self.motion.setIdlePostureEnabled({"Body"} ,bool(value))
+        self.motion.setIdlePostureEnabled({"Head"} ,bool(value))
+
+    def on_control_collision_avoidance(self, _, value):
+        print("Setting collision avoidance to: {}".format(value))
+        if not value:
+            # Use smaller security distances to avoid less obstacles
+            self.motion.setTangentialSecurityDistance(0.01)
+            self.motion.setOrthogonalSecurityDistance(0.01)
+        else:
+            # Use the default values
+            self.motion.setTangentialSecurityDistance(0.1)
+            self.motion.setOrthogonalSecurityDistance(0.4)

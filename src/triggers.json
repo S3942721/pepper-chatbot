@@ -30,5 +30,13 @@
     "Engaged": {
         "Signal": "ControlEngagement",
         "Value": true
+    },
+    "Move to Idle": {
+        "Signal": "ControlIdlePosition",
+        "Value": true
+    },
+    "!!!Collision Avoidance!!!": {
+        "Signal": "ControlCollisionAvoidance",
+        "Value": true
     }
 }
