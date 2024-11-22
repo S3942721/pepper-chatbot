@@ -26,6 +26,7 @@ DEFAULT_WELCOME = os.getenv('DEFAULT_WELCOME') or "False"
 URL = os.getenv('URL')
 CHAT_COMPLETION_ROUTE = os.getenv('CHAT_COMPLETION_ROUTE') or "/chat/completions"
 SPEECH_RECOGNITION_ROUTE = os.getenv('SPEECH_RECOGINITION_ROUTE') or '/speech/recognition'
+DEFAULT_SOCKET_URL = os.getenv('DEFAULT_SOCKET_URL') or '192.168.1.101'
 
 # openai
 MODEL_NAME = os.getenv('MODEL_NAME')
@@ -86,6 +87,9 @@ def main():
     parser.add_option("--webview",
         help="Start a webview server when this script starts. Speficy the url of webview.",
         dest="webview")
+    parser.add_option("--socket-url",
+        help="URL of the server running the pepper-controller.",
+        dest="socket_url")
     parser.set_defaults(
         volume=DEFAULT_VOLUME,
         ip=NAO_IP,
@@ -102,7 +106,8 @@ def main():
         fprompt='',
         fbehaviours='/home/nao/pepperchat/behaviours/behaviours_described.json',
         fsounds='/home/nao/pepperchat/media/sounds_described.json',
-        webview=WEBVIEW
+        webview=WEBVIEW,
+        socket_url=DEFAULT_SOCKET_URL
     )
 
     opts = parser.parse_args()[0]
@@ -122,6 +127,7 @@ def main():
     fbehaviours=opts.fbehaviours
     fsounds=opts.fsounds
     webview = opts.webview
+    socket_url = opts.socket_url
 
     # if not server_url:
     #     print('Error: Services route not specified!')
@@ -255,7 +261,7 @@ def main():
     global Motion
     Motion = MotionModule("Motion", ip, port)
 
-    socket_client = SocketClient('ec2-3-104-1-96.ap-southeast-2.compute.amazonaws.com', 3456)
+    socket_client = SocketClient(socket_url, 3456)
     socket_client.start()
 
     # memory.raiseEvent("Say", "**audio=quickbells**")
