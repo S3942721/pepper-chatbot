@@ -18,7 +18,13 @@ class BehaviourExecutor(ALModule):
         
         self.DEFAULT_RESPONSE_SPEED = 90
         self.response_speed = self.DEFAULT_RESPONSE_SPEED
-        self.response_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
+        self.response_speed_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
+        
+        self.DEFAULT_SENTENCE_PAUSE_DURATION = 5
+        self.sentence_pause_duration = self.DEFAULT_SENTENCE_PAUSE_DURATION
+        self.sentence_pause_string = "\\\\wait=" + str(self.sentence_pause_duration) + "\\\\"
+        
+        self.response_string = self.response_speed_string + self.sentence_pause_string
         
         self.memory = ALProxy("ALMemory", self.nao_ip, self.nao_port)
         
@@ -28,6 +34,7 @@ class BehaviourExecutor(ALModule):
         self.memory.subscribeToEvent("Mute", name, "on_mute")
         self.memory.subscribeToEvent("Volume", name, "volume")
         self.memory.subscribeToEvent("ChangeResponseSpeed", name, "on_response_speed_change")
+        self.memory.subscribeToEvent("ChangeSentencePause", name, "on_sentence_pause_change")
         self.memory.subscribeToEvent("ControlContextMovement", name, "on_control_tracking_mode")
         self.memory.subscribeToEvent("ControlEngagement", name, "on_control_engagement_mode")
         self.memory.subscribeToEvent("ControlAwareness", name, "on_control_basic_awareness")
@@ -197,9 +204,16 @@ class BehaviourExecutor(ALModule):
 
     def on_response_speed_change(self, event_name, value):
         self.response_speed = value
-        self.response_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
-        print("INF: GreetingsModule: Response speed changed to", value)
-        
+        self.response_speed_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
+        self.response_string = self.response_speed_string + self.sentence_pause_string
+        print("INF: GreetingsModule: Response speed changed to {}".format(value))
+    
+    def on_sentence_pause_change(self, event_name, value):
+        self.sentence_pause_duration = value
+        self.sentence_pause_string = "\\\\wait=" + str(self.sentence_pause_duration) + "\\\\"
+        self.response_string = self.response_speed_string + self.sentence_pause_string
+        print("INF: GreetingsModule: Sentence pause duration changed to {}".format(value))
+    
     def on_control_basic_awareness(self, event_name, value):
         print("Control basic awareness: {}".format(value))
         aba = ALProxy("ALBasicAwareness")

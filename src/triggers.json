@@ -3,6 +3,10 @@
         "Signal": "Mute",
         "Value": false
     },
+    "Move": {
+        "Signal": "ControlMovement",
+        "Value": false
+    },
     "Greetings": {
         "Signal": "ControlGreetings",
         "Value": false

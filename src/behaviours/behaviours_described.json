@@ -454,6 +454,14 @@
         ]
     }, 
     {
+        "action_description": "laughs quickly", 
+        "behaviour_key": "quicklaugh", 
+        "behaviour_variations": [
+            "animations/Stand/Emotions/Positive/Laugh_3", 
+            "animations/Stand/Emotions/Positive/Laugh_2"
+        ]
+    }, 
+    {
         "action_description": "leans in as if to listen", 
         "behaviour_key": "listening", 
         "behaviour_variations": [

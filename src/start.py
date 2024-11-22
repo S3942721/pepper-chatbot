@@ -3,10 +3,11 @@ from module_speechrecognition import SpeechRecognitionModule
 from module_eyecontact import EyeContactModule
 from module_greetings import GreetingsModule
 from module_healthy_check import HealthyCheckModule
-from naoqi import ALProxy, ALBroker
 from module_socket import SocketClient
 from module_expressions import BehaviourExecutor
+from module_motion import MotionModule
 
+from naoqi import ALProxy, ALBroker
 import time
 import os
 import sys
@@ -197,9 +198,12 @@ def main():
     memory.declareEvent("ChangeGreetFaceLostTimeout")
     memory.declareEvent("ChangeGreetTimeout")
     memory.declareEvent("ChangeResponseSpeed")
+    memory.declareEvent("ChangeSentencePause")
     memory.declareEvent("ControlContextMovement")
     memory.declareEvent("ControlAwareness")
     memory.declareEvent("ControlEngagement")
+    memory.declareEvent("ControlMovement")
+    memory.declareEvent("Move")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
@@ -247,6 +251,9 @@ def main():
     # if webview:
     global HealthyCheck
     HealthyCheck = HealthyCheckModule("HealthyCheck")
+    
+    global Motion
+    Motion = MotionModule("Motion", ip, port)
 
     socket_client = SocketClient('ec2-3-104-1-96.ap-southeast-2.compute.amazonaws.com', 3456)
     socket_client.start()
