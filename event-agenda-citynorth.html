@@ -92,6 +92,9 @@ QiSession(function(session) {
                 } else if(/Tom/i.test(value)) {
                     main.classList.remove('idle')
                     photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/Tom_Bentley.jpeg' alt='Tom Bentley'>"
+                } else if(/Steele/i.test(value)) {
+                    main.classList.remove('idle')
+                    photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/Wendy_Steele.jpg' alt='Wendy Steele'>"
                 } else {
                     main.classList.add('idle')
                     photo.innerHTML = "<img src='http://198.18.0.1/apps/rmit-race/racehub.png' class='wide' alt='RACE HUB'>"

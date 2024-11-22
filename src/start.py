@@ -19,7 +19,7 @@ load_env()
 
 NAO_IP = os.getenv('NAO_IP') or "localhost"
 NAO_PORT = toint(os.getenv('NAO_PORT')) or 9559
-DEFAULT_VOLUME = toint(os.getenv('DEFAULT_VOLUME')) or 50
+DEFAULT_VOLUME = toint(os.getenv('DEFAULT_VOLUME')) or 80
 DEFAULT_WELCOME = os.getenv('DEFAULT_WELCOME') or "False"
 
 # server

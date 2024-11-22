@@ -342,8 +342,6 @@
         "action_description": "does a wave, this works for both hello and goodbye", 
         "behaviour_key": "hey", 
         "behaviour_variations": [
-            "animations/Stand/Gestures/Hey_3", 
-            "animations/Stand/Gestures/Hey_8", 
             "animations/Stand/Gestures/Hey_4", 
             "animations/Stand/Gestures/Hey_9", 
             "animations/Stand/Gestures/Hey_1", 

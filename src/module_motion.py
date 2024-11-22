@@ -135,8 +135,12 @@ class MotionModule(ALModule):
         self.current_engagement = value
     
     def on_control_idle_position(self, _, value):
-        self.motion.setIdlePostureEnabled({"Body"} ,bool(value))
-        self.motion.setIdlePostureEnabled({"Head"} ,bool(value))
+        self.motion.setIdlePostureEnabled("Body" ,bool(value))
+        self.motion.setIdlePostureEnabled("Head" ,bool(value))
+        self.motion.setIdlePostureEnabled("Arms" ,bool(value))
+        self.motion.setIdlePostureEnabled("Legs" ,bool(value))
+        
+        print("Setting idle position to: {}".format(value))
 
     def on_control_collision_avoidance(self, _, value):
         print("Setting collision avoidance to: {}".format(value))
