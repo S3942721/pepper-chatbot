@@ -118,6 +118,16 @@
         "**audio=singlebell** ^start(hey) almost time ^wait(hey)",
         "**audio=singlebell** ^start(hey) 30 seconds left ^wait(hey)"
     ],
+    "Excuse me": [
+        "^start(hey) Excuse me ^wait(hey)",
+        "^start(hey) Pardon me ^wait(hey)",
+        "^start(hey) Sorry ^wait(hey)",
+        "^start(hey) My apologies ^wait(hey)",
+        "^start(hey) I'm sorry ^wait(hey)"
+    ],
+    "Excited": "^run(excited)",
+    "Impressed": "^run(impressed)",
+    "👏Clap": "^run(clap)",
     "🎸":"^run(airguitar)",
     "🕊️":"^run(wings)",
     "📸":"^run(takepicture)",
@@ -125,7 +135,7 @@
     "excited":"^run(excited)",
     "💪":"^run(fitness)",
     "🚁":"^run(helicopter)",
-    "👋":"^run(hey)",
+    "👋Wave":"^run(hey)",
     "Shy":"^run(shy)",
     "Yes":"^run(yes)",
     "No": [

@@ -78,6 +78,10 @@ class SocketClient(threading.Thread):
                             key_press_data = [str(key_press_data['key'].decode('utf-8')), bool(key_press_data['holding'])]
                             print("Converted move event with value: {}".format(key_press_data))
                             self.memory.raiseEvent('Move', key_press_data)
+                    elif(json_data['type'] == 'announcement'):
+                        # Change which announcement set to play
+                        if(json_data['message']):
+                            self.memory.raiseEvent('ChangeGreetingKey', str(json_data['message']))
 
             except ValueError:
                 for data in response:

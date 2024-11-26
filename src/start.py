@@ -6,6 +6,7 @@ from module_healthy_check import HealthyCheckModule
 from module_socket import SocketClient
 from module_expressions import BehaviourExecutor
 from module_motion import MotionModule
+from module_exploration import ExploringModule
 
 from naoqi import ALProxy, ALBroker
 import time
@@ -210,6 +211,9 @@ def main():
     memory.declareEvent("ControlEngagement")
     memory.declareEvent("ControlMovement")
     memory.declareEvent("Move")
+    memory.declareEvent("ControlExploration")
+    memory.declareEvent("ControlWandering")
+    memory.declareEvent("LockHead")
     
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
@@ -261,6 +265,9 @@ def main():
     global Motion
     Motion = MotionModule("Motion", ip, port)
 
+    global Exploration
+    Exploration = ExploringModule("Exploration")    
+
     socket_client = SocketClient(socket_url, 3456)
     socket_client.start()
 
@@ -279,6 +286,8 @@ def main():
     except KeyboardInterrupt:
         print()
         print("Interrupted by user, shutting down")
+        memory.raiseEvent("StopAction", None)
+        time.sleep(1)
         myBroker.shutdown()
         socket_client.join()
         sys.exit(0)

@@ -22,7 +22,7 @@ class GreetingsModule(ALModule):
 
         self.DEFAULT_SPEAK_TIMEOUT = 3 # default seconds to wait before speaking again
         self.speak_timeout = self.DEFAULT_SPEAK_TIMEOUT # seconds to wait before speaking again
-        self.DEFAULT_FACE_LOST_TIMEOUT = 1 # default seconds until face is considered lost
+        self.DEFAULT_FACE_LOST_TIMEOUT = 2 # default seconds until face is considered lost
         self.face_lost_timeout = self.DEFAULT_FACE_LOST_TIMEOUT # seconds until face is considered lost
         self.enabled_greetings = False
         self.last_spoken_time = 0
