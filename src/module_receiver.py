@@ -224,6 +224,11 @@ class BaseSpeechReceiverModule(ALModule):
     def processRemote(self, signalName, message):
         print("DEBUG: Received from: {}".format(signalName))
         print("DEBUG: Received message: {}".format(message))
+        
+        if message is None:
+            print("DEBUG: Received message is None. Ignoring.")
+            return
+        
         # While we process the message, we should stop the speech recognition
         self.memory.raiseEvent("Speaking", True)
         # Set the LEDs to white

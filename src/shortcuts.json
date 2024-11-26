@@ -144,6 +144,8 @@
     "⚠️Vine Boom": "$Sound=vine_boom",
     "⚠️🎺Womp Womp": "$Sound=womp_womp",
     "⚠️Sad Meow Song": "$Sound=sad_meow_song ^run(sad)",
+    "⚠️Cat Rot": "$Sound=cat_brain_rot",
+    "⚠️Ooeeaa": "$Sound=ooeeaa",
     "Strike a pose":"^run(strikeapose)",
     "Pose for photo":[
         "^start(strikeapose) Say cheese ^wait(strikeapose)",

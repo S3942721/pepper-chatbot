@@ -580,6 +580,21 @@
         ]
     }, 
     {
+        "action_description": "puts one hand up", 
+        "behaviour_key": "onehandup", 
+        "behaviour_variations": [
+            "animations/Stand/Gestures/Hey_1", 
+            "animations/Stand/Gestures/Hey_3"
+        ]
+    }, 
+    {
+        "action_description": "puts one hand up", 
+        "behaviour_key": "twohandsup", 
+        "behaviour_variations": [
+            "animations/Stand/Gestures/Hey_2"
+        ]
+    }, 
+    {
         "action_description": "moves his hands around interstingly", 
         "behaviour_key": "playhands", 
         "behaviour_variations": [

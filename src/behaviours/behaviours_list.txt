@@ -52,6 +52,7 @@
 "knockeye" - pretends their eye is broken and knocks their head to fix it
 "kungfu" - does a quick kungfu pose
 "laugh" - laughs
+"quicklaugh" - laughs quickly
 "listening" - leans in as if to listen
 "look" - looks to the ceiling and pretends to be thinking
 "lookhand" - looks at his hands as if to be discovering they are a robot, this can be funny

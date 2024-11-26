@@ -94,6 +94,8 @@ class SocketClient(threading.Thread):
                     self.client_socket.close()
                     self.connected = False
                     print("Connection Closed")
+            except Exception as e:
+                print("ERROR: Socket decode error {}".format(e))
 
     def join(self, timeout=None):
         self.running = False

@@ -1,7 +1,9 @@
 import threading
 import time
 import random
+import json
 from naoqi import ALProxy, ALModule
+import os
 
 class GreetingsModule(ALModule):
     def __init__(self, name):
@@ -16,6 +18,7 @@ class GreetingsModule(ALModule):
         self.memory.subscribeToEvent("LoadHTML", name, "update_profile")
         self.memory.subscribeToEvent("ChangeGreetTimeout", name, "on_speak_timeout_change")
         self.memory.subscribeToEvent("ChangeGreetFaceLostTimeout", name, "on_face_lost_timeout_change")
+        self.memory.subscribeToEvent("ChangeGreetingKey", name, "on_greeting_key_change")
 
         self.DEFAULT_SPEAK_TIMEOUT = 3 # default seconds to wait before speaking again
         self.speak_timeout = self.DEFAULT_SPEAK_TIMEOUT # seconds to wait before speaking again
@@ -26,164 +29,21 @@ class GreetingsModule(ALModule):
         self.has_been_greeted = False
         self.require_face_lost = False
         self.face_lost_timer = None
-        self.response_speed = 90
-        self.response_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
         self.waiting_for_greeting = False
-        
-        self.CN_GREETINGS = [
-            "^start(hey) {0} Hello ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Howdy ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hi ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hey ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Glad you came ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome in ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Nice to see you here ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Greetings, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hello, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Welcome, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, my name is Pepper ^wait(hey)".format(self.response_string),
-            "^start(bowshort) {0} Welcome ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Welcome in ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Nice to see you here ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Greetings, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Welcome, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, my name is Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(salute) {0} Welcome ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Welcome in ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Nice to see you here ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Greetings, I'm Pepper ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Hello, I'm Pepper ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome, I'm Pepper ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome, my name is Pepper ^wait(salute)".format(self.response_string),
-            "^start(hey) {0} Hello, welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Howdy, welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hi, welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hey, welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Glad you came to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome in to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Nice to see you here at RMIT's City North end of year showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Greetings, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hello, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Welcome, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, my name is Pepper, welcome to RMIT's City North end of year showcase ^wait(hey)".format(self.response_string),
-            "^start(bowshort) {0} Welcome to RMIT's City North end of year showcase ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Welcome in to RMIT's City North end of year showcase ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Nice to see you here at RMIT's City North end of year showcase ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Greetings, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Welcome, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, my name is Pepper, welcome to RMIT's City North end of year showcase ^wait(bowshort)".format(self.response_string),
-            "^start(salute) {0} Welcome to RMIT's City North end of year showcase ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Welcome in to RMIT's City North end of year showcase ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Nice to see you here at RMIT's City North end of year showcase ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Greetings, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Hello, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome, I'm Pepper, welcome to RMIT's City North end of year showcase ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome, my name is Pepper, welcome to RMIT's City North end of year showcase ^wait(salute)".format(self.response_string),
-            "^start(hey) {0} Welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hi, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Glad you came to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Nice to see you here at the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hello, I'm Pepper, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Welcome, I'm Pepper, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, my name is Pepper, welcome to the showcase ^wait(hey)".format(self.response_string),
-        ]
+        self.ANNOUNCEMENTS_PATH = os.path.join(os.path.dirname(__file__), 'announcements.json')
 
-        self.LTQ_GREETINGS = [
-            "^start(hey) {0} Hello ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Howdy ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hi ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hey ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Glad you came ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome in ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Nice to see you here ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Greetings, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hello, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Welcome, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, my name is Pepper ^wait(hey)".format(self.response_string),
-            "^start(bowshort) {0} Welcome ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Welcome in ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Nice to see you here ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Greetings, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Welcome, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, my name is Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(salute) {0} Welcome ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Welcome in ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Nice to see you here ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Greetings, I'm Pepper ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Hello, I'm Pepper ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome, I'm Pepper ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome, my name is Pepper ^wait(salute)".format(self.response_string),
-            "^start(hey) {0} Hello, welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Howdy, welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hi, welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hey, welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Glad you came to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome in to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Nice to see you here at the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Greetings, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hello, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Welcome, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, my name is Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(hey)".format(self.response_string),
-            "^start(bowshort) {0} Welcome to the STEM Learning and Teaching Showcase ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Welcome in to the STEM Learning and Teaching Showcase ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Nice to see you here at the STEM Learning and Teaching Showcase ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Greetings, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Welcome, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, my name is Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(bowshort)".format(self.response_string),
-            "^start(salute) {0} Welcome to the STEM Learning and Teaching Showcase ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Welcome in to the STEM Learning and Teaching Showcase ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Nice to see you here at the STEM Learning and Teaching Showcase ^wait(salute)".format(self.response_string), 
-            "^start(salute) {0} Greetings, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Hello, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome, I'm Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome, my name is Pepper, welcome to the STEM Learning and Teaching Showcase ^wait(salute)".format(self.response_string),
-            "^start(hey) {0} Welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hi, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Glad you came to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Nice to see you here at the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hello, I'm Pepper, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Welcome, I'm Pepper, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, my name is Pepper, welcome to the showcase ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} I hope you enjoy the showcase ^wait(hey)".format(self.response_string),
-            "^start(bowshort) {0} I hope you enjoy the showcase ^wait(bowshort)".format(self.response_string),
-            "^start(salute) {0} I hope you enjoy the showcase ^wait(salute)".format(self.response_string),
-        ]
-
-        self.DEFAULT_GREETINGS = [
-            "^start(hey) {0} Hello ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Howdy ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hi ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Hey ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Glad you came ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Welcome in ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Nice to see you here ^wait(hey)".format(self.response_string), 
-            "^start(hey) {0} Greetings, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hello, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Welcome, I'm Pepper ^wait(hey)".format(self.response_string),
-            "^start(hey) {0} Hey, my name is Pepper ^wait(hey)".format(self.response_string),
-            "^start(bowshort) {0} Welcome ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Welcome in ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Nice to see you here ^wait(bowshort)".format(self.response_string), 
-            "^start(bowshort) {0} Greetings, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Welcome, I'm Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(bowshort) {0} Hello, my name is Pepper ^wait(bowshort)".format(self.response_string),
-            "^start(salute) {0} Welcome ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Welcome in ^wait(salute)".format(self.response_string),
-            "^start(salute) {0} Nice to see you here ^wait(salute)".format(self.response_string)
-        ]
+        print("INF: GreetingsModule: Loading greetings from {}".format(self.ANNOUNCEMENTS_PATH))
+        # Load the greetings from the json
+        self.greetings_dictionary = {}
+        with open(self.ANNOUNCEMENTS_PATH, 'r') as file:
+            self.greetings_dictionary = json.load(file)
+        print("INF: GreetingsModule: Loaded greetings from {}".format(self.ANNOUNCEMENTS_PATH))
+        print("Loaded greetings: {}".format(self.greetings_dictionary))
         
+        self.CN_GREETINGS = "City North Greetings"
+        self.LTQ_GREETINGS = "LTQ Greetings"
+        self.DEFAULT_GREETINGS = "Default Greetings"
+
         self.greetings = self.DEFAULT_GREETINGS
 
     def __del__(self):
@@ -231,7 +91,7 @@ class GreetingsModule(ALModule):
                 self.face_lost_timer = None
         else:
             print("Face lost")
-            if self.face_detected:
+            if self.face_detected and not self.waiting_for_greeting and self.require_face_lost:
                 self.face_lost_timer = threading.Timer(self.face_lost_timeout, self.handle_status_change, [False])
                 self.face_lost_timer.start()
 
@@ -252,12 +112,17 @@ class GreetingsModule(ALModule):
         current_time = time.time()
         if current_time - self.last_spoken_time > self.speak_timeout and not (self.require_face_lost and self.has_been_greeted) and not self.waiting_for_greeting:
             self.has_been_greeted = True
-            greeting = random.choice(self.greetings)
-            self.memory.raiseEvent('Say', greeting)
+            if self.greetings in self.greetings_dictionary:
+                greeting = random.choice(self.greetings_dictionary[self.greetings])
+            else:
+                print("ERR: GreetingsModule: Invalid greetings key:", self.greetings)
+                greeting = random.choice(self.greetings_dictionary[self.DEFAULT_GREETINGS])
+
+            self.memory.raiseEvent('Say', str(greeting))
             self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "greeting_finished")
             self.waiting_for_greeting = True
             self.last_spoken_time = current_time
-    
+
     def greeting_finished(self, event_name, value):
         # Consider eye contact seen after greeting to prevent immediate re-greeting if face is lost mid greeting
         self.memory.unsubscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName())
@@ -267,6 +132,14 @@ class GreetingsModule(ALModule):
             self.has_been_greeted = True
             self.on_face_detected(None, True)
             self.on_face_detected(None, False) # Start face lost timer in case face is not detected immediately after greeting as face lost is only triggered once on face lost
+
+    def on_greeting_key_change(self, event_name, value):
+        # Change the greetings keyword in the json file
+        if value in self.greetings_dictionary:
+            self.greetings = value
+            print("INF: GreetingsModule: Changed greetings to {}".format(value))
+        else:
+            print("ERR: GreetingsModule: Invalid greetings key: {}".format(value))
 
     def stop(self):
         self.memory.unsubscribeToEvent("FaceDetected", self.getName())

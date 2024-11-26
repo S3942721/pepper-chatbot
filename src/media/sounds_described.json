@@ -92,5 +92,19 @@
         "audio_variations": [
             "/data/home/nao/pepperchat/media/sad-meow-song.wav"
         ]
+    },
+    {
+        "audio_description": "oo ee aa aa",
+        "audio_key": "ooeeaa",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/ooeeaa.wav"
+        ]
+    },
+    {
+        "audio_description": "cat brain rot song",
+        "audio_key": "cat_brain_rot",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/cat-brainrot-song.wav"
+        ]
     }
 ]

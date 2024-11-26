@@ -51,11 +51,17 @@ class MotionModule(ALModule):
         self.memory.subscribeToEvent("ControlMovementTimeout", name, "on_control_movement_timeout")
         self.memory.subscribeToEvent("ControlMovement", name, "on_control_movement")
         self.memory.subscribeToEvent("ControlEngagement", name, "on_control_engagement")
+        self.memory.subscribeToEvent("ControlAwareness", name, "on_control_awareness")
+        self.memory.subscribeToEvent("ControlContextMovement", name, "on_control_context_movement")
         self.memory.subscribeToEvent("ControlIdlePosition", name, "on_control_idle_position")
         self.memory.subscribeToEvent("ControlCollisionAvoidance", name, "on_control_collision_avoidance")
 
         self.current_engagement = True
+        self.current_awareness = True
+        self.current_context_movement = True
         self.previous_engagement = self.current_engagement
+        self.previous_awareness = self.current_awareness
+        self.previous_context_movement = self.current_context_movement
 
     def reset_move_timer(self):
         if self.move_timer:
@@ -103,7 +109,11 @@ class MotionModule(ALModule):
             self.stop_moving(None, "MoveTimeout")
             return
         self.previous_engagement = self.current_engagement
+        self.previous_awareness = self.current_awareness
+        self.previous_context_movement = self.current_context_movement
         self.memory.raiseEvent("ControlEngagement", False)
+        self.memory.raiseEvent("ControlAwareness", False)
+        self.memory.raiseEvent("ControlContextMovement", False)
         self.motion.move(x, y, theta, self.move_config)
         print("Moving with x: {}, y: {}, theta: {}".format(x, y, theta))
 
@@ -112,6 +122,8 @@ class MotionModule(ALModule):
         print("Stopped moving")
         if value == "MoveTimeout":
             self.memory.raiseEvent("ControlEngagement", self.previous_engagement)
+            self.memory.raiseEvent("ControlAwareness", self.previous_awareness)
+            self.memory.raiseEvent("ControlContextMovement", self.previous_context_movement)
         if self.move_timer:
             print("No message received, stopping movement timer for safety")
             self.move_timer.cancel()
@@ -133,6 +145,12 @@ class MotionModule(ALModule):
     
     def on_control_engagement(self, _, value):
         self.current_engagement = value
+    
+    def on_control_awareness(self, _, value):
+        self.current_awareness = value
+
+    def on_control_context_movement(self, _, value):
+        self.current_context_movement = value
     
     def on_control_idle_position(self, _, value):
         self.motion.setIdlePostureEnabled("Body" ,bool(value))
