@@ -27,6 +27,7 @@ class ExploringModule(ALModule):
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking_event")
         self.memory.subscribeToEvent("ControlWandering", self.getName(), "on_control_wandering")
         self.memory.subscribeToEvent("ControlExploration", self.getName(), "on_control_exploration")
+        self.memory.subscribeToEvent("StopAction", self.getName(), "stop_exploring")
 
         print("INF: ExploringModule: initialized with name: {}".format(name))
 
@@ -84,12 +85,14 @@ class ExploringModule(ALModule):
         self.motion_service.setAngles("HeadPitch", -0.3, 0.1)
 
     def stop_exploring(self):
+        exploring = self.exploring
         self.exploring = False
         self.navigation_service.stopExploration()
-        time.sleep(0.1)
+
         # Send move to 0,0,0 to stop the robot
         self.motion_service.move(0.0, 0.0, 0.0)
-        self.motion_service.move(0.0, 0.0, 0.0)
+        if exploring:
+            self.posture_service.goToPosture("StandInit", self.FRACTION_MAX_SPEED)
 
     def on_control_exploration(self, event_name, value):
         print("INF: ExploringModule: on_control_exploration called with value: {}".format(value))

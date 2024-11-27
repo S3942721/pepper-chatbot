@@ -22,6 +22,7 @@ NAO_IP = os.getenv('NAO_IP') or "localhost"
 NAO_PORT = toint(os.getenv('NAO_PORT')) or 9559
 DEFAULT_VOLUME = toint(os.getenv('DEFAULT_VOLUME')) or 80
 DEFAULT_WELCOME = os.getenv('DEFAULT_WELCOME') or "False"
+DEFAULT_URL = os.getenv('DEFAULT_URL') or "event-agenda-ltq.html"
 
 # server
 URL = os.getenv('URL')
@@ -275,6 +276,8 @@ def main():
     # memory.raiseEvent("Say", "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red ^wait(you) \\\\pau=1000\\\\")
     # memory.raiseEvent("Say", "^run(helicopter) $EyeColour=red $Sound=get_to_the_choppa $EyeColour=red")
 
+    # Load the default HTML for logo
+    memory.raiseEvent("LoadHTML", "http://198.18.0.1/apps/rmit-race/event-agenda-ltq.html")
     print("I am alive.")
 
     try:

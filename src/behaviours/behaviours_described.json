@@ -1000,5 +1000,89 @@
         "behaviour_variations": [
             "animations/Stand/Waiting/Zombie_1"
         ]
+    },
+    {
+        "action_description": "does a disco dance", 
+        "behaviour_key": "disco", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/disco"
+        ]
+    },
+    {
+        "action_description": "pretends to be an elephant", 
+        "behaviour_key": "elephant", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/elephant"
+        ]
+    },
+    {
+        "action_description": "does a disco dance with music", 
+        "behaviour_key": "disco_w_music", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/disco_w_music"
+        ]
+    },
+    {
+        "action_description": "pretends to play football", 
+        "behaviour_key": "football", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/football"
+        ]
+    },
+    {
+        "action_description": "pretends to play golf", 
+        "behaviour_key": "golf", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/golf"
+        ]
+    },
+    {
+        "action_description": "pretends to be a gorilla", 
+        "behaviour_key": "gorilla", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/gorilla"
+        ]
+    },
+    {
+        "action_description": "does a headbang", 
+        "behaviour_key": "headbang", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/headbang"
+        ]
+    },
+    {
+        "action_description": "does a headbang with music", 
+        "behaviour_key": "headbang_w_music", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/headbang_w_music"
+        ]
+    },
+    {
+        "action_description": "pretends to be a mouse", 
+        "behaviour_key": "mouse", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/mouse"
+        ]
+    },
+    {
+        "action_description": "pretends to play the saxophone", 
+        "behaviour_key": "saxaphone", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/saxaphone"
+        ]
+    },
+    {
+        "action_description": "does a tai chi chuan move", 
+        "behaviour_key": "taichichuan", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/taichichuan"
+        ]
+    },
+    {
+        "action_description": "pretends to vacuum", 
+        "behaviour_key": "vacuum", 
+        "behaviour_variations": [
+            "naoanimations-5e61c9/vacuum"
+        ]
     }
 ]

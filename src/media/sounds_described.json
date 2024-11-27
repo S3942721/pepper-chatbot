@@ -106,5 +106,19 @@
         "audio_variations": [
             "/data/home/nao/pepperchat/media/cat-brainrot-song.wav"
         ]
+    },
+    {
+        "audio_description": "Teams ping",
+        "audio_key": "teams_ping",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/ms-teams-notification.wav"
+        ]
+    },
+    {
+        "audio_description": "Teams call",
+        "audio_key": "teams_call",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/teams-call.wav"
+        ]
     }
 ]

@@ -12,10 +12,11 @@ class MotionModule(ALModule):
         self.head_movement_thread = None
         self.head_movement_stop_event = threading.Event()
         
+        self.MIN_HEAD_SPEED = 0.01
         self.DEFAULT_MOVEMENT_ENABLED = True
         self.DEFAULT_MOVEMENT_SPEED = 0.3
         self.DEFAULT_TURN_SPEED = 0.6
-        self.DEFAULT_HEAD_SPEED = 0.075
+        self.DEFAULT_HEAD_SPEED = 0.2
         self.DEFAULT_MOVEMENT_TIMEOUT = 5.0
         self.motion_enabled = self.DEFAULT_MOVEMENT_ENABLED
         self.movement_speed = self.DEFAULT_MOVEMENT_SPEED
@@ -116,31 +117,57 @@ class MotionModule(ALModule):
                 self.head_movement_stop_event.clear()
                 self.head_movement_thread = threading.Thread(target=self.head_movement_loop)
                 self.head_movement_thread.start()
-        else:
-            self.head_movement_stop_event.set()
+        # else:
+        #     self.head_movement_stop_event.set()
 
     def head_movement_loop(self):
+        # print("|||||||| Starting head movement loop ||||||||")
+        current_head_speed = self.MIN_HEAD_SPEED
+        ramp_up = True
+        previous_head_pitch, previous_head_yaw = 0.0, 0.0
         while not self.head_movement_stop_event.is_set():
+            # print("Head movement loop running")
             headPitch, headYaw = 0.0, 0.0
             for key_data in self.keys_pressed:
                 if key_data["holding"]:
                     if key_data["key"] == "ARROWUP":
-                        headPitch -= self.head_speed
+                        headPitch -= current_head_speed / 2
+                        # print("Arrow Up")
                     elif key_data["key"] == "ARROWDOWN":
-                        headPitch += self.head_speed
+                        headPitch += current_head_speed / 2
+                        # print("Arrow Down")
                     elif key_data["key"] == "ARROWLEFT":
-                        headYaw += self.head_speed
+                        headYaw += current_head_speed
+                        # print("Arrow Left")
                     elif key_data["key"] == "ARROWRIGHT":
-                        headYaw -= self.head_speed
+                        headYaw -= current_head_speed
+                        # print("Arrow Right")
             if headPitch != 0.0 or headYaw != 0.0:
-                self.motion.changeAngles(["HeadPitch", "HeadYaw"], [headPitch, headYaw], self.head_speed)
-                print("Moving head with pitch: {}, yaw: {}".format(headPitch, headYaw))
+                # print("Head movement detected")
+                current_head_speed = min(max(current_head_speed, self.MIN_HEAD_SPEED), self.head_speed)
+                if ramp_up and current_head_speed < self.head_speed:
+                    current_head_speed += 0.01
+                # print("Current head speed: {}".format(current_head_speed))
+                self.motion.changeAngles(["HeadPitch", "HeadYaw"], [headPitch, headYaw], current_head_speed)
+                previous_head_pitch, previous_head_yaw = headPitch, headYaw
+                # print("Moving head with pitch: {}, yaw: {}".format(headPitch, headYaw))
             else:
-                self.head_movement_stop_event.set()
-            self.head_movement_stop_event.wait(0.1)
+                # print("No head movement detected")
+                if current_head_speed > self.MIN_HEAD_SPEED:
+                    # print("Ramping down head movement")
+                    current_head_speed -= 0.03
+                    current_head_speed = max(current_head_speed, self.MIN_HEAD_SPEED)
+                    self.motion.changeAngles(
+                        ["HeadPitch", "HeadYaw"],
+                        [previous_head_pitch / 2, previous_head_yaw / 2],
+                        current_head_speed
+                    )
+                else:
+                    # print("Head movement stopped")
+                    self.head_movement_stop_event.set()
+            self.head_movement_stop_event.wait(0.05)
 
     def stop_moving(self, _, value):
-        self.memory.raiseEvent("ControlExploration", value)
         self.motion.stopMove()
         print("Stopped moving")
         if value == "MoveTimeout":
