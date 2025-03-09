@@ -41,6 +41,7 @@ class MotionModule(ALModule):
         self.memory = ALProxy("ALMemory", self.nao_ip, self.nao_port)
 
         self.memory.subscribeToEvent("Move", name, "on_move")
+        self.memory.subscribeToEvent("ContinuousMove", name, "on_move")
         self.memory.subscribeToEvent("StopAction", name, "stop_moving")
         self.memory.subscribeToEvent("ControlMovementSpeed", name, "on_control_movement_speed")
         self.memory.subscribeToEvent("ControlTurnSpeed", name, "on_control_turn_speed")
@@ -70,55 +71,84 @@ class MotionModule(ALModule):
         self.movement_speed = value
         print("Movement speed set to: {}".format(self.movement_speed))
 
-    def on_move(self, _, key_press_data):
+    def on_move(self, name, move_data):
+        print("MOVE FROM: ", name)
         if not self.motion_enabled:
             print("Movement is disabled, ignoring move event")
             return
-        print("Received move event with value: {}".format(key_press_data))
+        print("Received move event with value: {}".format(move_data))
         self.reset_move_timer()
-        x, y, theta = 0.0, 0.0, 0.0
-        
-        key, holding = key_press_data
-        for key_data in self.keys_pressed:
-            if key_data["key"] == key:
-                key_data["holding"] = holding
-                print("Updated key press data: {}".format(self.keys_pressed))
 
-        for i, key in enumerate(self.KEYS):
-            if self.keys_pressed[int(i)]["holding"]:
-                if key == "W":
-                    x += self.movement_speed
-                elif key == "S":
-                    x -= self.movement_speed
-                elif key == "A":
-                    y += self.movement_speed
-                elif key == "D":
-                    y -= self.movement_speed
-                elif key == "Q":
-                    theta += self.turn_speed
-                elif key == "E":
-                    theta -= self.turn_speed
-                print("Key {} is being held. Updated movement values to x: {}, y: {}, theta: {}".format(key, x, y, theta))
+        if name == "ContinuousMove":
+            controller_x, controller_y, controller_hx, controller_hy = move_data
+            x, y = -controller_y, -controller_x
+            x_vel = self.movement_speed * x
+            y_vel = self.movement_speed * y
+            theta = 0.0
+            for i, key in enumerate(self.KEYS):
+                if self.keys_pressed[int(i)]["holding"]:
+                    if key == "Q":
+                        theta = self.turn_speed
+                    elif key == "E":
+                        theta = -self.turn_speed
 
-        if x == 0.0 and y == 0.0 and theta == 0.0:
-            self.stop_moving(None, "MoveTimeout")
-        else:
             self.previous_engagement = self.current_engagement
             self.previous_awareness = self.current_awareness
             self.previous_context_movement = self.current_context_movement
             self.memory.raiseEvent("ControlEngagement", False)
             self.memory.raiseEvent("ControlAwareness", False)
             self.memory.raiseEvent("ControlContextMovement", False)
-            self.motion.move(x, y, theta, self.move_config)
-            print("Moving with x: {}, y: {}, theta: {}".format(x, y, theta))
+            self.motion.move(x_vel, y_vel, theta, self.move_config)
+            print("Moving continuously with x: {}, y: {}".format(x, y))
 
-        if any(key_data["holding"] for key_data in self.keys_pressed if key_data["key"] in ["ARROWUP", "ARROWDOWN", "ARROWLEFT", "ARROWRIGHT"]):
-            if self.head_movement_thread is None or not self.head_movement_thread.is_alive():
-                self.head_movement_stop_event.clear()
-                self.head_movement_thread = threading.Thread(target=self.head_movement_loop)
-                self.head_movement_thread.start()
-        # else:
-        #     self.head_movement_stop_event.set()
+            # Head movement
+            head_pitch = -controller_hy * self.head_speed
+            head_yaw = -controller_hx * self.head_speed
+            self.motion.changeAngles(["HeadPitch", "HeadYaw"], [head_pitch, head_yaw], self.head_speed)
+            print("Moving head with pitch: {}, yaw: {}".format(head_pitch, head_yaw))
+        else:
+            x, y, theta = 0.0, 0.0, 0.0
+            key, holding = move_data
+            for key_data in self.keys_pressed:
+                if key_data["key"] == key:
+                    key_data["holding"] = holding
+                    print("Updated key press data: {}".format(self.keys_pressed))
+
+            for i, key in enumerate(self.KEYS):
+                if self.keys_pressed[int(i)]["holding"]:
+                    if key == "W":
+                        x += self.movement_speed
+                    elif key == "S":
+                        x -= self.movement_speed
+                    elif key == "A":
+                        y += self.movement_speed
+                    elif key == "D":
+                        y -= self.movement_speed
+                    elif key == "Q":
+                        theta += self.turn_speed
+                    elif key == "E":
+                        theta -= self.turn_speed
+                    print("Key {} is being held. Updated movement values to x: {}, y: {}, theta: {}".format(key, x, y, theta))
+
+            if x == 0.0 and y == 0.0 and theta == 0.0:
+                self.stop_moving(None, "MoveTimeout")
+            else:
+                self.previous_engagement = self.current_engagement
+                self.previous_awareness = self.current_awareness
+                self.previous_context_movement = self.current_context_movement
+                self.memory.raiseEvent("ControlEngagement", False)
+                self.memory.raiseEvent("ControlAwareness", False)
+                self.memory.raiseEvent("ControlContextMovement", False)
+                self.motion.move(x, y, theta, self.move_config)
+                print("Moving with x: {}, y: {}, theta: {}".format(x, y, theta))
+
+            if any(key_data["holding"] for key_data in self.keys_pressed if key_data["key"] in ["ARROWUP", "ARROWDOWN", "ARROWLEFT", "ARROWRIGHT"]):
+                if self.head_movement_thread is None or not self.head_movement_thread.is_alive():
+                    self.head_movement_stop_event.clear()
+                    self.head_movement_thread = threading.Thread(target=self.head_movement_loop)
+                    self.head_movement_thread.start()
+            # else:
+            #     self.head_movement_stop_event.set()
 
     def head_movement_loop(self):
         # print("|||||||| Starting head movement loop ||||||||")

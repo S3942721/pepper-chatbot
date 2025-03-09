@@ -29,6 +29,7 @@ URL = os.getenv('URL')
 CHAT_COMPLETION_ROUTE = os.getenv('CHAT_COMPLETION_ROUTE') or "/chat/completions"
 SPEECH_RECOGNITION_ROUTE = os.getenv('SPEECH_RECOGINITION_ROUTE') or '/speech/recognition'
 DEFAULT_SOCKET_URL = os.getenv('DEFAULT_SOCKET_URL') or '192.168.1.101'
+DEFAULT_SOCKET_PORT = os.getenv('DEFAULT_SOCKET_PORT') or '3456'
 
 # openai
 MODEL_NAME = os.getenv('MODEL_NAME')
@@ -92,6 +93,9 @@ def main():
     parser.add_option("--socket-url",
         help="URL of the server running the pepper-controller.",
         dest="socket_url")
+    parser.add_option("--socket-port",
+        help="Port of the server running the pepper-controller.",
+        dest="socket_port")
     parser.set_defaults(
         volume=DEFAULT_VOLUME,
         ip=NAO_IP,
@@ -109,7 +113,8 @@ def main():
         fbehaviours='/home/nao/pepperchat/behaviours/behaviours_described.json',
         fsounds='/home/nao/pepperchat/media/sounds_described.json',
         webview=WEBVIEW,
-        socket_url=DEFAULT_SOCKET_URL
+        socket_url=DEFAULT_SOCKET_URL,
+        socket_port=DEFAULT_SOCKET_PORT
     )
 
     opts = parser.parse_args()[0]
@@ -130,6 +135,7 @@ def main():
     fsounds=opts.fsounds
     webview = opts.webview
     socket_url = opts.socket_url
+    socket_port = opts.socket_port
 
     # if not server_url:
     #     print('Error: Services route not specified!')
@@ -212,6 +218,7 @@ def main():
     memory.declareEvent("ControlEngagement")
     memory.declareEvent("ControlMovement")
     memory.declareEvent("Move")
+    memory.declareEvent("ContinuousMove")
     memory.declareEvent("ControlExploration")
     memory.declareEvent("ControlWandering")
     memory.declareEvent("LockHead")
@@ -269,7 +276,7 @@ def main():
     global Exploration
     Exploration = ExploringModule("Exploration")    
 
-    socket_client = SocketClient(socket_url, 3456)
+    socket_client = SocketClient(socket_url, toint(socket_port))
     socket_client.start()
 
     # memory.raiseEvent("Say", "**audio=quickbells**")

@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import os
 import sys
 import subprocess
@@ -29,14 +31,14 @@ def run_command(command):
         sys.exit(result.returncode)
     print(result.stdout)
 
-def sync_files(remote_ip, sync_html, sync_hands_above_head):
-    try:
-        """Sync local files to the remote system."""
-        # Remove the existing folder on the remote system
-        remove_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'rm -rf {REMOTE_FOLDER}'"
-        run_command(remove_command)
-    except Exception as e:
-        print(f"Failed to remove remote folder: {e}")
+def sync_files(remote_ip, sync_html, sync_hands_above_head, sync_media, delete_remote):
+    if delete_remote:
+        try:
+            """Remove the existing folder on the remote system."""
+            remove_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'rm -rf {REMOTE_FOLDER}'"
+            run_command(remove_command)
+        except Exception as e:
+            print(f"Failed to remove remote folder: {e}")
 
     try:
         # Copy the local folder to the remote system
@@ -58,16 +60,17 @@ def sync_files(remote_ip, sync_html, sync_hands_above_head):
         except Exception as e:
             print(f"Failed to copy HTML files: {e}")
 
-    try:
-        # Create the remote media directory if it does not exist
-        create_media_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p {REMOTE_MEDIA_FOLDER}'"
-        run_command(create_media_dir_command)
+    if sync_media:
+        try:
+            # Create the remote media directory if it does not exist
+            create_media_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p {REMOTE_MEDIA_FOLDER}'"
+            run_command(create_media_dir_command)
 
-        # Copy the local media folder to the remote system
-        media_copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_MEDIA_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_MEDIA_FOLDER}"
-        run_command(media_copy_command)
-    except Exception as e:
-        print(f"Failed to copy media folder: {e}")
+            # Copy the local media folder to the remote system
+            media_copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_MEDIA_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_MEDIA_FOLDER}"
+            run_command(media_copy_command)
+        except Exception as e:
+            print(f"Failed to copy media folder: {e}")
 
     if sync_hands_above_head:
         try:
@@ -85,6 +88,8 @@ def main():
     """Main function to handle command line arguments and initiate file sync."""
     sync_html = False
     sync_hands_above_head = False
+    sync_media = False
+    delete_remote = False
     remote_ip = DEFAULT_IP
 
     for arg in sys.argv[1:]:
@@ -92,16 +97,23 @@ def main():
             sync_html = True
         elif arg == "-b":
             sync_hands_above_head = True
+        elif arg == "-m":
+            sync_media = True
         elif arg == "-a":
             sync_html = True
             sync_hands_above_head = True
+            sync_media = True
+        elif arg == "-d":
+            delete_remote = True
         else:
             remote_ip = arg
 
     print(f"Using remote IP: {remote_ip}")
     print(f"Sync HTML: {sync_html}")
     print(f"Sync Hands Above Head: {sync_hands_above_head}")
-    sync_files(remote_ip, sync_html, sync_hands_above_head)
+    print(f"Sync Media: {sync_media}")
+    print(f"Delete Remote Folder: {delete_remote}")
+    sync_files(remote_ip, sync_html, sync_hands_above_head, sync_media, delete_remote)
 
 if __name__ == "__main__":
     main()

@@ -70,4 +70,7 @@ venv/
 # Password file
 .pepper_password
 
+# Bashrc file
+.bashrc
+
 ignore_*
