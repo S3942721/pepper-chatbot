@@ -57,14 +57,14 @@ class ExploringModule(ALModule):
             self.non_interactive_timer.start()
 
     def start_exploring(self):
-        print("INF: ExploringModule: start called")
+        # print("INF: ExploringModule: start called")
         
         if not self.enabled_wandering:
-            print("INF: ExploringModule: wandering is not enabled, not starting exploration")
+            # print("INF: ExploringModule: wandering is not enabled, not starting exploration")
             return
 
         if self.exploring:
-            print("INF: ExploringModule: already exploring")
+            # print("INF: ExploringModule: already exploring")
             return
 
         def exploration_task(self):
@@ -75,9 +75,9 @@ class ExploringModule(ALModule):
         def explore():
             fut = qi.async(exploration_task, self)
 
-        print("INF: ExploringModule: starting exploration")
+        # print("INF: ExploringModule: starting exploration")
         explore()
-        print("INF: ExploringModule: started exploring!")
+        # print("INF: ExploringModule: started exploring!")
         self.exploring = True
         
         # Change head position to look up while exploring to find more faces
