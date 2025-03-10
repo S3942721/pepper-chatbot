@@ -1101,5 +1101,124 @@
         "behaviour_variations": [
             "naoanimations-5e61c9/vacuum"
         ]
+    },
+    {
+        "action_description": "Dances to Mika's Relax, this is a long dance that requires space", 
+        "behaviour_key": "dance_mika_relax", 
+        "behaviour_variations": [
+            "mika_relax-2c3b38/dance_mika_relax"
+        ]
+    },
+    {
+        "action_description": "Dances to La Bamba, this is a long dance that requires space", 
+        "behaviour_key": "dance_la_bamba", 
+        "behaviour_variations": [
+            "la_bamba-2bcabb"
+        ]
+    },
+    {
+        "action_description": "Dances to Hungarian dance music, this is a long dance that requires space", 
+        "behaviour_key": "dance_hungarian_full_default", 
+        "behaviour_variations": [
+            "hungarian-a7c2ea"
+        ]
+    },
+    {
+        "action_description": "Dances to Hungarian dance music, this is a long dance that requires space", 
+        "behaviour_key": "dance_hungarian_full", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/all_together"
+        ]
+    },
+    {
+        "action_description": "Pt 1 of Dance to Hungarian dance music", 
+        "behaviour_key": "dance_hungarian_pt1", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt1"
+        ]
+    },
+    {
+        "action_description": "Pt 2 of Dance to Hungarian dance music", 
+        "behaviour_key": "dance_hungarian_pt2", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt2"
+        ]
+    },
+    {
+        "action_description": "Pt 3 of Dance to Hungarian dance music", 
+        "behaviour_key": "dance_hungarian_pt3", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt3"
+        ]
+    },
+    {
+        "action_description": "Pt 4 of Dance to Hungarian dance music", 
+        "behaviour_key": "dance_hungarian_pt4", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt4"
+        ]
+    },
+    {
+        "action_description": "Pt 5 of Dance to Hungarian dance music", 
+        "behaviour_key": "dance_hungarian_pt5", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt5"
+        ]
+    },
+    {
+        "action_description": "Pt 6 of Dance to Hungarian dance music", 
+        "behaviour_key": "dance_hungarian_p6", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt6"
+        ]
+    },
+    {
+        "action_description": "Dances to Hungarian dance music muted, this is a long dance that requires space", 
+        "behaviour_key": "dance_hungarian_full_mute", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/all_together_mute"
+        ]
+    },
+    {
+        "action_description": "Pt 1 of Dance to Hungarian dance music muted", 
+        "behaviour_key": "dance_hungarian_pt1_mute", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt1_mute"
+        ]
+    },
+    {
+        "action_description": "Pt 2 of Dance to Hungarian dance music muted", 
+        "behaviour_key": "dance_hungarian_pt2_mute", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt2_mute"
+        ]
+    },
+    {
+        "action_description": "Pt 3 of Dance to Hungarian dance music muted", 
+        "behaviour_key": "dance_hungarian_pt3_mute", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt3_mute"
+        ]
+    },
+    {
+        "action_description": "Pt 4 of Dance to Hungarian dance music muted", 
+        "behaviour_key": "dance_hungarian_pt4_mute", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt4_mute"
+        ]
+    },
+    {
+        "action_description": "Pt 5 of Dance to Hungarian dance music muted", 
+        "behaviour_key": "dance_hungarian_pt5_mute", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt5_mute"
+        ]
+    },
+    {
+        "action_description": "Pt 6 of Dance to Hungarian dance music muted", 
+        "behaviour_key": "dance_hungarian_p6_mute", 
+        "behaviour_variations": [
+            "hungarian_parts-4e01cb/pt6_mute"
+        ]
     }
 ]
