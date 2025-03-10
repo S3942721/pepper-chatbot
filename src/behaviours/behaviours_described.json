@@ -1167,7 +1167,7 @@
     },
     {
         "action_description": "Pt 6 of Dance to Hungarian dance music", 
-        "behaviour_key": "dance_hungarian_p6", 
+        "behaviour_key": "dance_hungarian_pt6", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt6"
         ]
@@ -1216,7 +1216,7 @@
     },
     {
         "action_description": "Pt 6 of Dance to Hungarian dance music muted", 
-        "behaviour_key": "dance_hungarian_p6_mute", 
+        "behaviour_key": "dance_hungarian_pt6_mute", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt6_mute"
         ]
