@@ -1,0 +1,124 @@
+[
+    {
+        "audio_description": "plays multiple bell noises", 
+        "audio_key": "multiplebells", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/multi_bell_1.wav",
+            "/data/home/nao/pepperchat/media/multi_bell_2.wav"
+        ]
+    },
+    {
+        "audio_description": "plays quick bell noises", 
+        "audio_key": "quickbells", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/quick_bell_1.wav",
+            "/data/home/nao/pepperchat/media/quick_bell_2.wav",
+            "/data/home/nao/pepperchat/media/quick_bell_3.wav"
+        ]
+    },
+    {
+        "audio_description": "plays single bell noise", 
+        "audio_key": "singlebell", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/single_bell.wav"
+        ]
+    },
+    {
+        "audio_description": "plays i'll be back by arnold schwarzenegger", 
+        "audio_key": "ill_be_back", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/ill-be-back.wav"
+        ]
+    },
+    {
+        "audio_description": "plays get to the choppa by arnold schwarzenegger", 
+        "audio_key": "get_to_the_choppa", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/get-to-the-choppa.wav"
+        ]
+    },
+    {
+        "audio_description": "plays error sound", 
+        "audio_key": "error", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/error.wav"
+        ]
+    },
+    {
+        "audio_description": "plays vine boom sound", 
+        "audio_key": "vine_boom", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/vine-boom.wav"
+        ]
+    },
+    {
+        "audio_description": "plays calm bell sound", 
+        "audio_key": "calm_bell", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/calm_bell.wav"
+        ]
+    },
+    {
+        "audio_description": "plays yippee sound", 
+        "audio_key": "yippee", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/yippee.wav"
+        ]
+    },
+    {
+        "audio_description": "plays badoom tss sound", 
+        "audio_key": "badoom_tss", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/badoom_tss.wav"
+        ]
+    },
+    {
+        "audio_description": "plays womp womp sound", 
+        "audio_key": "womp_womp", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/womp_womp.wav"
+        ]
+    },
+    {
+        "audio_description": "plays crickets sound", 
+        "audio_key": "crickets", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/crickets.wav"
+        ]
+    },
+    {
+        "audio_description": "plays sad meow song", 
+        "audio_key": "sad_meow_song", 
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/sad-meow-song.wav"
+        ]
+    },
+    {
+        "audio_description": "oo ee aa aa",
+        "audio_key": "ooeeaa",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/ooeeaa.wav"
+        ]
+    },
+    {
+        "audio_description": "cat brain rot song",
+        "audio_key": "cat_brain_rot",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/cat-brainrot-song.wav"
+        ]
+    },
+    {
+        "audio_description": "Teams ping",
+        "audio_key": "teams_ping",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/ms-teams-notification.wav"
+        ]
+    },
+    {
+        "audio_description": "Teams call",
+        "audio_key": "teams_call",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/teams-call.wav"
+        ]
+    }
+]

@@ -24,9 +24,9 @@ from numpy import sqrt, mean, square
 import traceback
 
 
-RECORDING_DURATION = 10      # seconds, maximum recording time, also default value for startRecording(), Google Speech API only accepts up to about 10-15 seconds
+RECORDING_DURATION = 12      # seconds, maximum recording time, also default value for startRecording(), Google Speech API only accepts up to about 10-15 seconds
 LOOKAHEAD_DURATION = 1.0    # seconds, for auto-detect mode: amount of seconds before the threshold trigger that will be included in the request
-IDLE_RELEASE_TIME = 2.0     # seconds, for auto-detect mode: idle time (RMS below threshold) after which we stop recording and recognize
+IDLE_RELEASE_TIME = 1.5     # seconds, for auto-detect mode: idle time (RMS below threshold) after which we stop recording and recognize
 HOLD_TIME = 2.0             # seconds, minimum recording time after we started recording (autodetection)
 SAMPLE_RATE = 48000         # Hz, be careful changing this, both google and Naoqi have requirements!
 
@@ -44,7 +44,7 @@ class SpeechRecognitionModule(ALModule):
     Your callback needs to be a method with two parameter (variable name, value).
     """
 
-    def __init__( self, strModuleName, strNaoIp, port, stt_url, stt_route='/speech/recognition', stt_api_key='no-key' ):
+    def __init__( self, strModuleName, strNaoIp, port, stt_url, stt_route='/speech/recognition', stt_api_key='no-key', volume = 50 ):
         try:
             ALModule.__init__(self, strModuleName )
 
@@ -58,16 +58,21 @@ class SpeechRecognitionModule(ALModule):
             self.stt_url = stt_url
             self.stt_route = stt_route
             self.stt_api_key = stt_api_key
+            self.volume = volume
 
             # self.inited = False
             self.isStarted = False
 
             self.eye_contact = False
             self.is_speaking = False
+            self.is_allowed_recording = True
 
             self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
             self.memory.subscribeToEvent("EyeContact", self.getName(), "eye_contact_toggle")
             self.memory.subscribeToEvent("Speaking", self.getName(), "speaking_toggle")
+            self.memory.subscribeToEvent("ControlRecording", self.getName(), "recording_toggle")
+            self.memory.subscribeToEvent("ClearSpeechRecognitionBuffer", self.getName(), "clear_buffer")
+            self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
 
             # flag to indicate if we are currently recording audio
             self.isRecording = False
@@ -96,6 +101,11 @@ class SpeechRecognitionModule(ALModule):
 
             # counter for wav file output
             self.fileCounter = 0
+            
+            # turn off native pepper speech recognition
+            asr = ALProxy("ALSpeechRecognition", self.strNaoIp, port)
+            asr.setVisualExpression(False)  # disable LEDs for when speech is detected (spinning blue eyes)
+            asr.setAudioExpression(False)   # disable beep noise when speech is detected
 
         except BaseException as err:
             print( "ERR: SpeechRecognitionModule: loading error: %s" % str(err) )
@@ -103,7 +113,7 @@ class SpeechRecognitionModule(ALModule):
     # __init__ - end
     def __del__( self ):
         print( "INF: SpeechRecognitionModule.__del__: cleaning everything" )
-        self.stop()
+        self.stop()    
 
     def start( self ):
         if(self.isStarted):
@@ -114,10 +124,15 @@ class SpeechRecognitionModule(ALModule):
         self.isStarted = True
 
         audio = ALProxy( "ALAudioDevice")
+        audio.setOutputVolume(self.volume)
         nNbrChannelFlag = 0 # ALL_Channels: 0,  AL::LEFTCHANNEL: 1, AL::RIGHTCHANNEL: 2 AL::FRONTCHANNEL: 3  or AL::REARCHANNEL: 4.
         nDeinterleave = 0
         audio.setClientPreferences( self.getName(),  SAMPLE_RATE, nNbrChannelFlag, nDeinterleave ) # setting same as default generate a bug !?!
         audio.subscribe( self.getName() )
+
+    def clear_all(self, _, value):
+        self.clear_buffer(_)
+        self.memory.raiseEvent("Listening", False)
 
     def pause(self):
         if not self.isStarted:
@@ -139,14 +154,34 @@ class SpeechRecognitionModule(ALModule):
         self.toggle_status()
 
     def speaking_toggle(self, _, is_speaking):
-        self.is_speaking = not not is_speaking
+        self.is_speaking = bool(is_speaking)
         self.toggle_status()
 
+    def recording_toggle(self, _, allowed_recording):
+        if allowed_recording:
+            audio = ALProxy( "ALAudioDevice")
+            audio.setOutputVolume(self.volume)
+            print("INF: SpeechRecognitionModule: volume set to %s" % self.volume)
+        else:
+            audio = ALProxy( "ALAudioDevice")
+            audio.setOutputVolume(0)
+            print("INF: SpeechRecognitionModule: volume set to 0")
+        
+        self.is_allowed_recording = allowed_recording
+        self.toggle_status()
+        # self.memory.raiseEvent("ResetConversation", True)
+
     def toggle_status(self):
-        if self.eye_contact and not self.is_speaking:
+        if self.eye_contact and not self.is_speaking and self.is_allowed_recording:
             self.start()
         else:
             self.pause()
+    
+    def clear_buffer(self, _):
+        self.buffer = []
+        self.preBuffer = []
+        self.preBufferLength = 0
+        self.startRecordingTimestamp = -1
 
     def processRemote( self, nbOfChannels, nbrOfSamplesByChannel, aTimeStamp, buffer ):
         #print("INF: SpeechRecognitionModule: Processing '%s' channels" % nbOfChannels)
@@ -181,21 +216,30 @@ class SpeechRecognitionModule(ALModule):
                 if (self.startRecordingTimestamp <= 0):
                     # initialize timestamp when we start recording
                     self.startRecordingTimestamp = timestamp
-                # elif ((timestamp - self.startRecordingTimestamp) > self.recordingDuration):
-                #     # print('stop after max recording duration')
-                #     # check how long we are recording
-                #     self.stopRecordingAndRecognize()
+                    self.memory.raiseEvent("Log", "I'm listening to you now")
+                    self.memory.raiseEvent("Listening", True)
+                elif ((timestamp - self.startRecordingTimestamp) > self.recordingDuration):
+                    self.memory.raiseEvent("Log", "Analysing what you said...")
+                    self.memory.raiseEvent("Listening", False)
+                    print('Max recording duration hit')
+                    # check how long we are recording
+                    self.stopRecordingAndRecognize()
 
                 # stop recording after idle time (and recording at least hold time)
                 # lastTimeRMSPeak is 0 if no peak occured
                 if (timestamp - self.lastTimeRMSPeak >= self.idleReleaseTime) and (
                         timestamp - self.startRecordingTimestamp >= self.holdTime):
                     # print(('stopping after idle/hold time'))
+                    self.memory.raiseEvent("Log", "Analysing what you said...")
+                    self.memory.raiseEvent("Listening", False)
                     self.stopRecordingAndRecognize()
             else:
                 # constantly record into prebuffer for lookahead
                 self.preBuffer.append(aSoundData)
                 self.preBufferLength += len(aSoundData[0])
+                
+                # Reset the prebuffer if we are not recording
+                self.startRecordingTimestamp = -1
 
                 # remove first (oldest) item if the buffer gets bigger than required
                 # removes one block of samples as we store a list of lists...

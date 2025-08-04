@@ -63,7 +63,14 @@ venv/
 
 # recorded debug audio files
 *.raw
-*.wav
 
 .env
 *.csv
+
+# Password file
+.pepper_password
+
+# Bashrc file
+.bashrc
+
+ignore_*

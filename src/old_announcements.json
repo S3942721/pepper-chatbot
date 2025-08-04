@@ -1,0 +1,348 @@
+{
+    "RMIT Tent Greetings":[
+        "^start(hey) Hello, I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+        "^start(hey) Howdy, I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+        "^start(hey) I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+
+        "^start(hey) Hey, I'm Haku. Check out our soccer robots ^wait(hey)",
+        "^start(hey) Howdy, I'm Haku. Check out our soccer robots ^wait(hey)",
+        "^start(hey) I'm Haku. Check out our soccer robots ^wait(hey)",
+
+        "^start(hey) Have a look at our rocket display ^wait(hey)",
+        "^start(hey) Howdy, have a look at our rocket display ^wait(hey)",
+
+        "^start(hey) You should try the three sixty degree helicopter simulator ^wait(hey)",
+        "^start(hey) Howdy, you should try the three sixty degree helicopter simulator ^wait(hey)",
+
+        "^start(hey) Don't forget to see the solar panel car ^wait(hey)",
+        "^start(hey) Howdy, don't forget to see the solar panel car ^wait(hey)",
+
+        "^start(hey) Step into VR and fight some aliens ^wait(hey)",
+        "^start(hey) Howdy, step into VR and fight some aliens ^wait(hey)",
+
+        "^start(hey) Take a look at our formula SAE car ^wait(hey)",
+        "^start(hey) Howdy, take a look at our formula SAE car ^wait(hey)",
+
+        "^start(hey) Test drive the motion simulator on the Melbourne GP circuit ^wait(hey)",
+        "^start(hey) Howdy, test drive the motion simulator on the Melbourne GP circuit ^wait(hey)",
+
+        "^start(hey) Watch how RMIT pushes engineering boundaries ^wait(hey)",
+        "^start(hey) Howdy, watch how RMIT pushes engineering boundaries ^wait(hey)",
+
+        "^start(hey) It's fun in here ^wait(hey)",
+        "^start(hey) Howdy, it's fun in here ^wait(hey)",
+
+        "^start(bowshort) Hello, I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+        "^start(bowshort) Howdy, I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+        "^start(bowshort) I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+
+        "^start(bowshort) Check out the soccer robots in action ^wait(bowshort)",
+        "^start(bowshort) Howdy, check out the soccer robots in action ^wait(bowshort)",
+
+        "^start(bowshort) Try the three sixty degree helicopter ride ^wait(bowshort)",
+        "^start(bowshort) Howdy, try the three sixty degree helicopter ride ^wait(bowshort)",
+
+        "^start(bowshort) Have a look at our rocket demo ^wait(bowshort)",
+        "^start(bowshort) Howdy, have a look at our rocket demo ^wait(bowshort)",
+
+        "^start(bowshort) Don't miss the solar car engineering ^wait(bowshort)",
+        "^start(bowshort) Howdy, don't miss the solar car engineering ^wait(bowshort)",
+
+        "^start(bowshort) Explore the formula SAE car up close ^wait(bowshort)",
+        "^start(bowshort) Howdy, explore the formula SAE car up close ^wait(bowshort)",
+
+        "^start(bowshort) Hop into our motion simulator ^wait(bowshort)",
+        "^start(bowshort) Howdy, hop into our motion simulator ^wait(bowshort)",
+
+        "^start(bowshort) Join us in pushing boundaries at RMIT ^wait(bowshort)",
+        "^start(bowshort) Howdy, join us in pushing boundaries at RMIT ^wait(bowshort)",
+
+        "^start(bowshort) Feel free to ask our amazing staff anything ^wait(bowshort)",
+        "^start(bowshort) Howdy, feel free to ask our amazing staff anything ^wait(bowshort)",
+
+        "^start(salute) Hi, I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+        "^start(salute) Howdy, I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+        "^start(salute) I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+
+        "^start(salute) See the soccer robots in action ^wait(salute)",
+        "^start(salute) Howdy, see the soccer robots in action ^wait(salute)",
+
+        "^start(salute) Check out the rocket display ^wait(salute)",
+        "^start(salute) Howdy, check out the rocket display ^wait(salute)",
+
+        "^start(salute) You can pilot the three sixty degree helicopter sim ^wait(salute)",
+        "^start(salute) Howdy, you can pilot the three sixty degree helicopter sim ^wait(salute)",
+
+        "^start(salute) Explore our solar panel car project ^wait(salute)",
+        "^start(salute) Howdy, explore our solar panel car project ^wait(salute)",
+
+        "^start(salute) Take a spin in VR against aliens ^wait(salute)",
+        "^start(salute) Howdy, take a spin in VR against aliens ^wait(salute)",
+
+        "^start(salute) Our formula SAE car is a must-see ^wait(salute)",
+        "^start(salute) Howdy, our formula SAE car is a must-see ^wait(salute)",
+
+        "^start(salute) Try the motion simulator on the track ^wait(salute)",
+        "^start(salute) Howdy, try the motion simulator on the track ^wait(salute)",
+
+        "^start(salute) RMIT is leading in innovation ^wait(salute)",
+        "^start(salute) Howdy, RMIT is leading in innovation ^wait(salute)",
+
+        "^start(salute) I hope you enjoy your time here ^wait(salute)",
+        "^start(salute) Howdy, I hope you enjoy your time here ^wait(salute)"
+    ],
+    "LTQ Greetings": [
+        "^start(hey) Hello, I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+        "^start(hey) Howdy, I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+        "^start(hey) I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+
+        "^start(hey) Hey, I'm Haku. Check out our soccer robots ^wait(hey)",
+        "^start(hey) Howdy, I'm Haku. Check out our soccer robots ^wait(hey)",
+        "^start(hey) I'm Haku. Check out our soccer robots ^wait(hey)",
+
+        "^start(hey) Have a look at our rocket display ^wait(hey)",
+        "^start(hey) Howdy, have a look at our rocket display ^wait(hey)",
+
+        "^start(hey) You should try the three sixty degree helicopter simulator ^wait(hey)",
+        "^start(hey) Howdy, you should try the three sixty degree helicopter simulator ^wait(hey)",
+
+        "^start(hey) Don't forget to see the solar panel car ^wait(hey)",
+        "^start(hey) Howdy, don't forget to see the solar panel car ^wait(hey)",
+
+        "^start(hey) Step into VR and fight some aliens ^wait(hey)",
+        "^start(hey) Howdy, step into VR and fight some aliens ^wait(hey)",
+
+        "^start(hey) Take a look at our formula SAE car ^wait(hey)",
+        "^start(hey) Howdy, take a look at our formula SAE car ^wait(hey)",
+
+        "^start(hey) Test drive the motion simulator on the Melbourne GP circuit ^wait(hey)",
+        "^start(hey) Howdy, test drive the motion simulator on the Melbourne GP circuit ^wait(hey)",
+
+        "^start(hey) Watch how RMIT pushes engineering boundaries ^wait(hey)",
+        "^start(hey) Howdy, watch how RMIT pushes engineering boundaries ^wait(hey)",
+
+        "^start(hey) It's fun in here ^wait(hey)",
+        "^start(hey) Howdy, it's fun in here ^wait(hey)",
+
+        "^start(bowshort) Hello, I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+        "^start(bowshort) Howdy, I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+        "^start(bowshort) I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+
+        "^start(bowshort) Check out the soccer robots in action ^wait(bowshort)",
+        "^start(bowshort) Howdy, check out the soccer robots in action ^wait(bowshort)",
+
+        "^start(bowshort) Try the three sixty degree helicopter ride ^wait(bowshort)",
+        "^start(bowshort) Howdy, try the three sixty degree helicopter ride ^wait(bowshort)",
+
+        "^start(bowshort) Have a look at our rocket demo ^wait(bowshort)",
+        "^start(bowshort) Howdy, have a look at our rocket demo ^wait(bowshort)",
+
+        "^start(bowshort) Don't miss the solar car engineering ^wait(bowshort)",
+        "^start(bowshort) Howdy, don't miss the solar car engineering ^wait(bowshort)",
+
+        "^start(bowshort) Explore the formula SAE car up close ^wait(bowshort)",
+        "^start(bowshort) Howdy, explore the formula SAE car up close ^wait(bowshort)",
+
+        "^start(bowshort) Hop into our motion simulator ^wait(bowshort)",
+        "^start(bowshort) Howdy, hop into our motion simulator ^wait(bowshort)",
+
+        "^start(bowshort) Join us in pushing boundaries at RMIT ^wait(bowshort)",
+        "^start(bowshort) Howdy, join us in pushing boundaries at RMIT ^wait(bowshort)",
+
+        "^start(bowshort) Feel free to ask our amazing staff anything ^wait(bowshort)",
+        "^start(bowshort) Howdy, feel free to ask our amazing staff anything ^wait(bowshort)",
+
+        "^start(salute) Hi, I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+        "^start(salute) Howdy, I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+        "^start(salute) I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+
+        "^start(salute) See the soccer robots in action ^wait(salute)",
+        "^start(salute) Howdy, see the soccer robots in action ^wait(salute)",
+
+        "^start(salute) Check out the rocket display ^wait(salute)",
+        "^start(salute) Howdy, check out the rocket display ^wait(salute)",
+
+        "^start(salute) You can pilot the three sixty degree helicopter sim ^wait(salute)",
+        "^start(salute) Howdy, you can pilot the three sixty degree helicopter sim ^wait(salute)",
+
+        "^start(salute) Explore our solar panel car project ^wait(salute)",
+        "^start(salute) Howdy, explore our solar panel car project ^wait(salute)",
+
+        "^start(salute) Take a spin in VR against aliens ^wait(salute)",
+        "^start(salute) Howdy, take a spin in VR against aliens ^wait(salute)",
+
+        "^start(salute) Our formula SAE car is a must-see ^wait(salute)",
+        "^start(salute) Howdy, our formula SAE car is a must-see ^wait(salute)",
+
+        "^start(salute) Try the motion simulator on the track ^wait(salute)",
+        "^start(salute) Howdy, try the motion simulator on the track ^wait(salute)",
+
+        "^start(salute) RMIT is leading in innovation ^wait(salute)",
+        "^start(salute) Howdy, RMIT is leading in innovation ^wait(salute)",
+
+        "^start(salute) I hope you enjoy your time here ^wait(salute)",
+        "^start(salute) Howdy, I hope you enjoy your time here ^wait(salute)"
+    ],
+    "City North Greetings": [
+        "^start(hey) Hello, I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+        "^start(hey) Howdy, I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+        "^start(hey) I'm Haku. Welcome to RMIT's Grand Prix tent ^wait(hey)",
+
+        "^start(hey) Hey, I'm Haku. Check out our soccer robots ^wait(hey)",
+        "^start(hey) Howdy, I'm Haku. Check out our soccer robots ^wait(hey)",
+        "^start(hey) I'm Haku. Check out our soccer robots ^wait(hey)",
+
+        "^start(hey) Have a look at our rocket display ^wait(hey)",
+        "^start(hey) Howdy, have a look at our rocket display ^wait(hey)",
+
+        "^start(hey) You should try the three sixty degree helicopter simulator ^wait(hey)",
+        "^start(hey) Howdy, you should try the three sixty degree helicopter simulator ^wait(hey)",
+
+        "^start(hey) Don't forget to see the solar panel car ^wait(hey)",
+        "^start(hey) Howdy, don't forget to see the solar panel car ^wait(hey)",
+
+        "^start(hey) Step into VR and fight some aliens ^wait(hey)",
+        "^start(hey) Howdy, step into VR and fight some aliens ^wait(hey)",
+
+        "^start(hey) Take a look at our formula SAE car ^wait(hey)",
+        "^start(hey) Howdy, take a look at our formula SAE car ^wait(hey)",
+
+        "^start(hey) Test drive the motion simulator on the Melbourne GP circuit ^wait(hey)",
+        "^start(hey) Howdy, test drive the motion simulator on the Melbourne GP circuit ^wait(hey)",
+
+        "^start(hey) Watch how RMIT pushes engineering boundaries ^wait(hey)",
+        "^start(hey) Howdy, watch how RMIT pushes engineering boundaries ^wait(hey)",
+
+        "^start(hey) It's fun in here ^wait(hey)",
+        "^start(hey) Howdy, it's fun in here ^wait(hey)",
+
+        "^start(bowshort) Hello, I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+        "^start(bowshort) Howdy, I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+        "^start(bowshort) I'm Haku. Welcome to our Grand Prix showcase ^wait(bowshort)",
+
+        "^start(bowshort) Check out the soccer robots in action ^wait(bowshort)",
+        "^start(bowshort) Howdy, check out the soccer robots in action ^wait(bowshort)",
+
+        "^start(bowshort) Try the three sixty degree helicopter ride ^wait(bowshort)",
+        "^start(bowshort) Howdy, try the three sixty degree helicopter ride ^wait(bowshort)",
+
+        "^start(bowshort) Have a look at our rocket demo ^wait(bowshort)",
+        "^start(bowshort) Howdy, have a look at our rocket demo ^wait(bowshort)",
+
+        "^start(bowshort) Don't miss the solar car engineering ^wait(bowshort)",
+        "^start(bowshort) Howdy, don't miss the solar car engineering ^wait(bowshort)",
+
+        "^start(bowshort) Explore the formula SAE car up close ^wait(bowshort)",
+        "^start(bowshort) Howdy, explore the formula SAE car up close ^wait(bowshort)",
+
+        "^start(bowshort) Hop into our motion simulator ^wait(bowshort)",
+        "^start(bowshort) Howdy, hop into our motion simulator ^wait(bowshort)",
+
+        "^start(bowshort) Join us in pushing boundaries at RMIT ^wait(bowshort)",
+        "^start(bowshort) Howdy, join us in pushing boundaries at RMIT ^wait(bowshort)",
+
+        "^start(bowshort) Feel free to ask our amazing staff anything ^wait(bowshort)",
+        "^start(bowshort) Howdy, feel free to ask our amazing staff anything ^wait(bowshort)",
+
+        "^start(salute) Hi, I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+        "^start(salute) Howdy, I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+        "^start(salute) I'm Haku. Welcome to RMIT's F1 experience ^wait(salute)",
+
+        "^start(salute) See the soccer robots in action ^wait(salute)",
+        "^start(salute) Howdy, see the soccer robots in action ^wait(salute)",
+
+        "^start(salute) Check out the rocket display ^wait(salute)",
+        "^start(salute) Howdy, check out the rocket display ^wait(salute)",
+
+        "^start(salute) You can pilot the three sixty degree helicopter sim ^wait(salute)",
+        "^start(salute) Howdy, you can pilot the three sixty degree helicopter sim ^wait(salute)",
+
+        "^start(salute) Explore our solar panel car project ^wait(salute)",
+        "^start(salute) Howdy, explore our solar panel car project ^wait(salute)",
+
+        "^start(salute) Take a spin in VR against aliens ^wait(salute)",
+        "^start(salute) Howdy, take a spin in VR against aliens ^wait(salute)",
+
+        "^start(salute) Our formula SAE car is a must-see ^wait(salute)",
+        "^start(salute) Howdy, our formula SAE car is a must-see ^wait(salute)",
+
+        "^start(salute) Try the motion simulator on the track ^wait(salute)",
+        "^start(salute) Howdy, try the motion simulator on the track ^wait(salute)",
+
+        "^start(salute) RMIT is leading in innovation ^wait(salute)",
+        "^start(salute) Howdy, RMIT is leading in innovation ^wait(salute)",
+
+        "^start(salute) I hope you enjoy your time here ^wait(salute)",
+        "^start(salute) Howdy, I hope you enjoy your time here ^wait(salute)"
+    ],
+    "Default Greetings": [
+        "^start(hey) Hello ^wait(hey)", 
+        "^start(hey) Howdy ^wait(hey)", 
+        "^start(hey) Hi ^wait(hey)", 
+        "^start(hey) Hey ^wait(hey)", 
+        "^start(hey) Glad you came ^wait(hey)", 
+        "^start(hey) Welcome ^wait(hey)", 
+        "^start(hey) Welcome in ^wait(hey)", 
+        "^start(hey) Nice to see you here ^wait(hey)", 
+        "^start(hey) Greetings, I'm Haku ^wait(hey)",
+        "^start(hey) Hello, I'm Haku ^wait(hey)",
+        "^start(hey) Welcome, I'm Haku ^wait(hey)",
+        "^start(hey) Hey, my name is Haku ^wait(hey)",
+        "^start(bowshort) Welcome ^wait(bowshort)", 
+        "^start(bowshort) Welcome in ^wait(bowshort)", 
+        "^start(bowshort) Nice to see you here ^wait(bowshort)", 
+        "^start(bowshort) Greetings, I'm Haku ^wait(bowshort)",
+        "^start(bowshort) Hello, I'm Haku ^wait(bowshort)",
+        "^start(bowshort) Welcome, I'm Haku ^wait(bowshort)",
+        "^start(bowshort) Hello, my name is Haku ^wait(bowshort)",
+        "^start(salute) Welcome ^wait(salute)",
+        "^start(salute) Welcome in ^wait(salute)",
+        "^start(salute) Nice to see you here ^wait(salute)"
+    ],
+    "I hope you are enjoying the session": [
+        "I hope you are enjoying the session",
+        "I hope you are enjoying the session so far",
+        "I hope you are enjoying the session today",
+        "I hope you are enjoying your time here"
+    ],
+    "General small talk in passing": [
+        "Hope you liked the presentations",
+        "Hope you are enjoying the showcase",
+        "Hope you are enjoying the showcase so far",
+        "Hope you are enjoying the showcase today",
+        "What's for Lunch?",
+        "Those were some excellent presentations",
+        "I hope you are enjoying the session",
+        "I hope you are enjoying the session so far"
+    ],
+    "15m left": [
+        "**audio=calm_bell** Hey everyone 15 minutes left of this session",
+        "**audio=calm_bell** 15 minutes left everyone",
+        "**audio=calm_bell** Just letting you know there is 15 minutes left",
+        "**audio=calm_bell** ^start(hey) 15 minutes left of this session ^wait(hey)",
+        "**audio=calm_bell** ^start(hey) 15 minutes left everyone ^wait(hey)",
+        "**audio=calm_bell** ^start(hey) 15 minutes left ^wait(hey)",
+        "**audio=calm_bell** Excuse me, sorry to interrupt, but there are 15 minutes left",
+        "**audio=calm_bell** Excuse me, sorry to interrupt, 15 minutes left everyone"
+    ],
+    "10m left": [
+        "**audio=calm_bell** Hey everyone 10 minutes left of this session",
+        "**audio=calm_bell** 10 minutes left everyone",
+        "**audio=calm_bell** Just letting you know there is 10 minutes left",
+        "**audio=calm_bell** ^start(hey) 10 minutes left of this session ^wait(hey)",
+        "**audio=calm_bell** ^start(hey) 10 minutes left everyone ^wait(hey)",
+        "**audio=calm_bell** ^start(hey) 10 minutes left ^wait(hey)",
+        "**audio=calm_bell** Excuse me, sorry to interrupt, but there are 10 minutes left",
+        "**audio=calm_bell** Excuse me, sorry to interrupt, 10 minutes left everyone"
+    ],
+    "5m left": [
+        "**audio=calm_bell** Hey everyone 5 minutes left of this session",
+        "**audio=calm_bell** 5 minutes left everyone",
+        "**audio=calm_bell** Just letting you know there is 5 minutes left",
+        "**audio=calm_bell** ^start(hey) 5 minutes left of this session ^wait(hey)",
+        "**audio=calm_bell** ^start(hey) 5 minutes left everyone ^wait(hey)",
+        "**audio=calm_bell** ^start(hey) 5 minutes left ^wait(hey)",
+        "**audio=calm_bell** Excuse me, sorry to interrupt, but there are 5 minutes left",
+        "**audio=calm_bell** Excuse me, sorry to interrupt, 5 minutes left everyone"
+    ]
+}
