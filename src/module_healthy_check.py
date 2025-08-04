@@ -28,9 +28,13 @@ class HealthyCheckModule(ALModule):
         if not self.webview_url: return
         self.memory.raiseEvent("HealthyCheck", "ping")
         self.got_pong = False
-        time.sleep(1)
+        self.got_pong = self.tablet_service.preLoadImage(self.webview_url)
+        print("Getting pong")
+        time.sleep(10)
+        print("Got pong: {}".format(self.got_pong))
         if not self.got_pong:
             print("No pong from tablet, reloading webview")
+            self.tablet_service.preLoadImage(self.webview_url)
             self.tablet_service.showWebview(self.webview_url)
             time.sleep(2)
             self.sync()
