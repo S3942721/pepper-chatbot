@@ -114,6 +114,7 @@ def main():
     print(f"Sync Media: {sync_media}")
     print(f"Delete Remote Folder: {delete_remote}")
     sync_files(remote_ip, sync_html, sync_hands_above_head, sync_media, delete_remote)
+    print("Sync completed.")
 
 if __name__ == "__main__":
     main()
