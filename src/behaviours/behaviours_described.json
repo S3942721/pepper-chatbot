@@ -1089,6 +1089,48 @@
         ]
     },
     {
+        "action_description": "Dances to Gangnamstyle, this is a long dance that requires space", 
+        "behaviour_key": "dance_gangnamstyle", 
+        "behaviour_variations": [
+            "jgangnamstyle-d7ea26"
+        ]
+    },
+    {
+        "action_description": "Dances to Dango Dango, this is a long dance that requires space", 
+        "behaviour_key": "dance_dango", 
+        "behaviour_variations": [
+            "dango3kyodai-2e833b"
+        ]
+    },
+    {
+        "action_description": "Dances to Dance of The Nights, this is a long dance that requires space", 
+        "behaviour_key": "dance_of_the_nights", 
+        "behaviour_variations": [
+            "danceoftheknights-169092"
+        ]
+    },
+    {
+        "action_description": "Dances a salsa dance, this is a long dance that requires space", 
+        "behaviour_key": "dance_salsa_dancing", 
+        "behaviour_variations": [
+            "asereje-9e71b3"
+        ]
+    },
+    {
+        "action_description": "Dances the nut cracker, this is a long dance that requires space", 
+        "behaviour_key": "dance_nut_cracker", 
+        "behaviour_variations": [
+            "danceofthereedflutes-93ba8f"
+        ]
+    },
+    {
+        "action_description": "Dances to Walk This Way, this is a long dance that requires space", 
+        "behaviour_key": "dance_walk_this_way", 
+        "behaviour_variations": [
+            "walk_this_way-553cea"
+        ]
+    },
+    {
         "action_description": "does a tai chi chuan move", 
         "behaviour_key": "taichichuan", 
         "behaviour_variations": [
@@ -1106,7 +1148,7 @@
         "action_description": "Dances to Mika's Relax, this is a long dance that requires space", 
         "behaviour_key": "dance_mika_relax", 
         "behaviour_variations": [
-            "mika_relax-2c3b38/dance_mika_relax"
+            "mika_relax-2c3b38"
         ]
     },
     {
