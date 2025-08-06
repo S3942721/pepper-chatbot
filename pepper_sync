@@ -4,6 +4,7 @@ import os
 import sys
 import subprocess
 import glob
+import argparse
 
 # Constants
 DEFAULT_IP = "192.168.1.100"
@@ -86,34 +87,36 @@ def sync_files(remote_ip, sync_html, sync_hands_above_head, sync_media, delete_r
 
 def main():
     """Main function to handle command line arguments and initiate file sync."""
-    sync_html = False
-    sync_hands_above_head = False
-    sync_media = False
-    delete_remote = False
-    remote_ip = DEFAULT_IP
-
-    for arg in sys.argv[1:]:
-        if arg == "-h":
-            sync_html = True
-        elif arg == "-b":
-            sync_hands_above_head = True
-        elif arg == "-m":
-            sync_media = True
-        elif arg == "-a":
-            sync_html = True
-            sync_hands_above_head = True
-            sync_media = True
-        elif arg == "-d":
-            delete_remote = True
-        else:
-            remote_ip = arg
-
-    print(f"Using remote IP: {remote_ip}")
-    print(f"Sync HTML: {sync_html}")
-    print(f"Sync Hands Above Head: {sync_hands_above_head}")
-    print(f"Sync Media: {sync_media}")
-    print(f"Delete Remote Folder: {delete_remote}")
-    sync_files(remote_ip, sync_html, sync_hands_above_head, sync_media, delete_remote)
+    parser = argparse.ArgumentParser(description="Sync files to Pepper robot")
+    
+    parser.add_argument("ip", nargs="?", default=DEFAULT_IP, 
+                       help=f"Remote IP address (default: {DEFAULT_IP})")
+    parser.add_argument("-H", "--html", action="store_true", 
+                       help="Sync HTML files")
+    parser.add_argument("-b", "--hands-above-head", action="store_true", 
+                       help="Sync hands above head behavior")
+    parser.add_argument("-m", "--media", action="store_true", 
+                       help="Sync media folder")
+    parser.add_argument("-a", "--all", action="store_true", 
+                       help="Sync all optional components (HTML, hands above head, media)")
+    parser.add_argument("-d", "--delete", action="store_true", 
+                       help="Delete remote folder before syncing")
+    
+    args = parser.parse_args()
+    
+    # If --all is specified, enable all sync options
+    if args.all:
+        args.html = True
+        args.hands_above_head = True
+        args.media = True
+    
+    print(f"Using remote IP: {args.ip}")
+    print(f"Sync HTML: {args.html}")
+    print(f"Sync Hands Above Head: {args.hands_above_head}")
+    print(f"Sync Media: {args.media}")
+    print(f"Delete Remote Folder: {args.delete}")
+    
+    sync_files(args.ip, args.html, args.hands_above_head, args.media, args.delete)
     print("Sync completed.")
 
 if __name__ == "__main__":
