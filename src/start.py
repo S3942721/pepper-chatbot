@@ -230,23 +230,26 @@ def main():
 
     speech_recoginition_url = os.getenv('SPEECH_RECOGINITION_URL') or server_url
 
-    # global SpeechRecognition
-    # SpeechRecognition = SpeechRecognitionModule(
-    #     "SpeechRecognition", ip, port,
-    #     speech_recoginition_url, speech_route, speech_api_key, volume
-    # )
+    # Initialize speech recognition module for audio streaming
+    global SpeechRecognition
+    SpeechRecognition = SpeechRecognitionModule(
+        "SpeechRecognition", ip, port,
+        speech_recoginition_url, speech_route, speech_api_key, volume
+    )
 
     global EyeContact
     EyeContact = EyeContactModule("EyeContact")
 
-    # auto-detection
+    # auto-detection configuration (commented out since we're using for audio streaming)
     # SpeechRecognition.setHoldTime(tofloat(os.getenv('HOLD_TIME')) or 2.0)
     # SpeechRecognition.setIdleReleaseTime(tofloat(os.getenv('RELEASE_TIME')) or 1.0)
     # SpeechRecognition.setMaxRecordingDuration(tofloat(os.getenv('RECORD_DURATION')) or 7.0)
     # SpeechRecognition.setLookaheadDuration(tofloat(os.getenv('LOOK_AHEAD_DURATION')) or 0.5)
     # SpeechRecognition.setAutoDetectionThreshold(toint(os.getenv('AUTO_DETECTION_THREADSHOLD')) or 5)
     # SpeechRecognition.enableAutoDetection()
-    # SpeechRecognition.start()
+    
+    # Start speech recognition for audio capture (always on for streaming)
+    SpeechRecognition.start()
 
     global Expressions
     Expressions = BehaviourExecutor("Expressions", fbehaviours, fsounds, ip, port)
@@ -277,6 +280,8 @@ def main():
     Exploration = ExploringModule("Exploration")    
 
     socket_client = SocketClient(socket_url, toint(socket_port))
+    # Connect speech recognition module to socket client for audio streaming
+    socket_client.set_speech_module(SpeechRecognition)
     socket_client.start()
 
     # memory.raiseEvent("Say", "**audio=quickbells**")

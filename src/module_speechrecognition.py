@@ -67,13 +67,20 @@ class SpeechRecognitionModule(ALModule):
             self.is_speaking = False
             self.is_allowed_recording = True
 
+            # Audio streaming variables
+            self.audioStreamCallback = None
+            self.isStreamingEnabled = False
+            self.streamBuffer = []
+            self.maxStreamBufferSize = SAMPLE_RATE * 2  # 2 seconds of audio buffer
+
             self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
             self.memory.subscribeToEvent("EyeContact", self.getName(), "eye_contact_toggle")
             self.memory.subscribeToEvent("Speaking", self.getName(), "speaking_toggle")
             self.memory.subscribeToEvent("ControlRecording", self.getName(), "recording_toggle")
             self.memory.subscribeToEvent("ClearSpeechRecognitionBuffer", self.getName(), "clear_buffer")
             self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
-
+            # Remove ALMemory event subscriptions for audio streaming
+            
             # flag to indicate if we are currently recording audio
             self.isRecording = False
             self.startRecordingTimestamp = 0
@@ -194,6 +201,37 @@ class SpeechRecognitionModule(ALModule):
 
             aSoundDataInterlaced = np.fromstring( str(buffer), dtype=np.int16 )
             aSoundData = np.reshape( aSoundDataInterlaced, (nbOfChannels, nbrOfSamplesByChannel), 'F' )
+
+            # Handle audio streaming with improved debugging
+            if self.isStreamingEnabled and self.audioStreamCallback:
+                # Use front microphone (channel 0) for streaming
+                audioData = aSoundData[0]
+                self.streamBuffer.extend(audioData)
+                
+                # Debug: Print buffer status occasionally
+                if len(self.streamBuffer) > 0 and len(self.streamBuffer) % 48000 == 0:
+                    print("DEBUG: Stream buffer size: {} samples ({:.2f} seconds)".format(
+                        len(self.streamBuffer), float(len(self.streamBuffer)) / SAMPLE_RATE))
+                
+                # Send buffer when it reaches a certain size (e.g., 0.1 seconds of audio)
+                chunkSize = int(SAMPLE_RATE * 0.1)  # 100ms chunks
+                while len(self.streamBuffer) >= chunkSize:
+                    chunk = self.streamBuffer[:chunkSize]
+                    self.streamBuffer = self.streamBuffer[chunkSize:]
+                    
+                    print("DEBUG: Sending audio chunk of {} samples to callback".format(len(chunk)))
+                    
+                    # Call the callback with the audio chunk
+                    try:
+                        self.audioStreamCallback(chunk)
+                    except Exception as e:
+                        print("ERR: Audio stream callback error: %s" % str(e))
+                
+                # Prevent buffer from growing too large
+                if len(self.streamBuffer) > self.maxStreamBufferSize:
+                    self.streamBuffer = self.streamBuffer[-self.maxStreamBufferSize:]
+            elif self.isStreamingEnabled and not self.audioStreamCallback:
+                print("DEBUG: Streaming enabled but no callback set")
 
             # compute RMS, handle autodetection
             if( self.isAutoDetectionEnabled or self.isRecording):

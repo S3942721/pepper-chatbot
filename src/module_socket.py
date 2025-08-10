@@ -3,6 +3,8 @@ import json
 import threading
 from naoqi import ALProxy
 import time
+import struct
+import numpy as np
 
 class SocketClient(threading.Thread):
     def __init__(self, server_addr, server_port):
@@ -12,19 +14,96 @@ class SocketClient(threading.Thread):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connected = False
         self.running = True
+        
+        # Audio streaming variables
+        self.audio_streaming_enabled = False
+        self.audio_send_lock = threading.Lock()
+        self.speech_module = None  # Direct reference to speech recognition module
 
         self.memory = ALProxy("ALMemory")
+
+    def set_speech_module(self, speech_module):
+        """Set reference to the speech recognition module"""
+        self.speech_module = speech_module
+        print("Speech module reference set in socket client")
 
     def connection(self):
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect((self.server_addr, self.server_port))
             self.connected = True
+            print("Socket connected to {}:{}".format(self.server_addr, self.server_port))
 
         except socket.error as e:
             print("Socket error:", e)
             self.client_socket.close()
             self.connected = False
+
+    def enable_audio_streaming(self):
+        """Enable audio streaming through the socket connection"""
+        if not self.audio_streaming_enabled and self.speech_module:
+            self.audio_streaming_enabled = True
+            # Set this instance as the callback directly in the speech module
+            self.speech_module.audioStreamCallback = self.send_audio_chunk
+            self.speech_module.isStreamingEnabled = True
+            self.speech_module.streamBuffer = []
+            print("Audio streaming enabled via socket - callback set directly")
+        elif not self.speech_module:
+            print("ERROR: Speech module reference not set - cannot enable audio streaming")
+
+    def disable_audio_streaming(self):
+        """Disable audio streaming"""
+        if self.audio_streaming_enabled and self.speech_module:
+            self.audio_streaming_enabled = False
+            self.speech_module.isStreamingEnabled = False
+            self.speech_module.audioStreamCallback = None
+            self.speech_module.streamBuffer = []
+            print("Audio streaming disabled")
+
+    def send_audio_chunk(self, audio_data):
+        """Send audio chunk through socket with proper framing"""
+        if not self.connected or not self.audio_streaming_enabled:
+            print("DEBUG: Cannot send audio - connected: {}, streaming: {}".format(
+                self.connected, self.audio_streaming_enabled))
+            return
+            
+        try:
+            with self.audio_send_lock:
+                # Convert numpy array to bytes if needed
+                if isinstance(audio_data, np.ndarray):
+                    audio_bytes = audio_data.astype(np.int16).tostring()
+                elif isinstance(audio_data, list):
+                    # Convert list to numpy array then to bytes
+                    audio_bytes = np.array(audio_data, dtype=np.int16).tostring()
+                else:
+                    print("ERROR: Unknown audio data type: {}".format(type(audio_data)))
+                    return
+                
+                print("DEBUG: Sending audio chunk - {} bytes".format(len(audio_bytes)))
+                
+                # Create audio packet with header
+                packet = {
+                    'type': 'audio_stream',
+                    'sample_rate': 48000,
+                    'channels': 1,
+                    'format': 'int16',
+                    'data_length': len(audio_bytes)
+                }
+                
+                # Send JSON header first
+                header_json = json.dumps(packet) + '\n'
+                self.client_socket.sendall(header_json.encode('utf-8'))
+                
+                # Send raw audio data
+                self.client_socket.sendall(audio_bytes)
+                print("DEBUG: Audio packet sent successfully")
+                
+        except socket.error as e:
+            print("Error sending audio data: {}".format(e))
+            self.connected = False
+            self.disable_audio_streaming()
+        except Exception as e:
+            print("Unexpected error in send_audio_chunk: {}".format(e))
 
     def run(self):
         buffer = ""
@@ -54,13 +133,18 @@ class SocketClient(threading.Thread):
                 print("Socket error:", e)
                 self.connected = False
                 self.client_socket.close()
+                self.disable_audio_streaming()
         if self.running:
             self.run()
 
     def process_message(self, json_data):
         print("Received message: {}".format(json_data))
         try:
-            if json_data['type'] == 'script':
+            if json_data['type'] == 'enable_audio_stream':
+                self.enable_audio_streaming()
+            elif json_data['type'] == 'disable_audio_stream':
+                self.disable_audio_streaming()
+            elif json_data['type'] == 'script':
                 msg = str(json_data['message'])
                 if msg:
                     self.memory.raiseEvent('StopAction', None)
@@ -111,6 +195,7 @@ class SocketClient(threading.Thread):
 
     def join(self, timeout=None):
         self.running = False
+        self.disable_audio_streaming()
         self.client_socket.sendall('SHUTDOWN'.encode('utf-8'))
         self.client_socket.close()
         print("Connection closed")
