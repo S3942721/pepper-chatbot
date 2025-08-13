@@ -7,6 +7,7 @@ from module_socket import SocketClient
 from module_expressions import BehaviourExecutor
 from module_motion import MotionModule
 from module_exploration import ExploringModule
+from module_audiostream import AudioStreamModule
 
 from naoqi import ALProxy, ALBroker
 import time
@@ -30,6 +31,8 @@ CHAT_COMPLETION_ROUTE = os.getenv('CHAT_COMPLETION_ROUTE') or "/chat/completions
 SPEECH_RECOGNITION_ROUTE = os.getenv('SPEECH_RECOGINITION_ROUTE') or '/speech/recognition'
 DEFAULT_SOCKET_URL = os.getenv('DEFAULT_SOCKET_URL') or '192.168.1.101'
 DEFAULT_SOCKET_PORT = os.getenv('DEFAULT_SOCKET_PORT') or '3456'
+DEFAULT_UDP_STREAM_HOST = os.getenv('DEFAULT_UDP_STREAM_HOST') or '192.168.1.101'
+DEFAULT_UDP_STREAM_PORT = os.getenv('DEFAULT_UDP_STREAM_PORT') or '9999'
 
 # openai
 MODEL_NAME = os.getenv('MODEL_NAME')
@@ -96,6 +99,12 @@ def main():
     parser.add_option("--socket-port",
         help="Port of the server running the pepper-controller.",
         dest="socket_port")
+    parser.add_option("--udp-stream-host",
+        help="Host for UDP audio streaming (like externalAudioStreamTest.py).",
+        dest="udp_stream_host")
+    parser.add_option("--udp-stream-port",
+        help="Port for UDP audio streaming.",
+        dest="udp_stream_port")
     parser.set_defaults(
         volume=DEFAULT_VOLUME,
         ip=NAO_IP,
@@ -114,7 +123,9 @@ def main():
         fsounds='/home/nao/pepperchat/media/sounds_described.json',
         webview=WEBVIEW,
         socket_url=DEFAULT_SOCKET_URL,
-        socket_port=DEFAULT_SOCKET_PORT
+        socket_port=DEFAULT_SOCKET_PORT,
+        udp_stream_host=DEFAULT_UDP_STREAM_HOST,
+        udp_stream_port=DEFAULT_UDP_STREAM_PORT
     )
 
     opts = parser.parse_args()[0]
@@ -136,6 +147,8 @@ def main():
     webview = opts.webview
     socket_url = opts.socket_url
     socket_port = opts.socket_port
+    udp_stream_host = opts.udp_stream_host
+    udp_stream_port = opts.udp_stream_port
 
     # if not server_url:
     #     print('Error: Services route not specified!')
@@ -222,7 +235,8 @@ def main():
     memory.declareEvent("ControlExploration")
     memory.declareEvent("ControlWandering")
     memory.declareEvent("LockHead")
-    
+    memory.declareEvent("ControlUDPAudioStreaming")
+
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
     asr.setVisualExpression(False)  # disable LEDs for when speech is detected (spinning blue eyes)
@@ -278,6 +292,13 @@ def main():
 
     global Exploration
     Exploration = ExploringModule("Exploration")    
+
+    # Initialize UDP audio streaming module
+    global AudioStream
+    AudioStream = AudioStreamModule(
+        "AudioStream", ip, port,
+        udp_stream_host, toint(udp_stream_port)
+    )
 
     socket_client = SocketClient(socket_url, toint(socket_port))
     # Connect speech recognition module to socket client for audio streaming
