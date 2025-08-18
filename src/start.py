@@ -31,8 +31,9 @@ CHAT_COMPLETION_ROUTE = os.getenv('CHAT_COMPLETION_ROUTE') or "/chat/completions
 SPEECH_RECOGNITION_ROUTE = os.getenv('SPEECH_RECOGINITION_ROUTE') or '/speech/recognition'
 DEFAULT_SOCKET_URL = os.getenv('DEFAULT_SOCKET_URL') or '192.168.1.101'
 DEFAULT_SOCKET_PORT = os.getenv('DEFAULT_SOCKET_PORT') or '3456'
-DEFAULT_UDP_STREAM_HOST = os.getenv('DEFAULT_UDP_STREAM_HOST') or '192.168.1.101'
-DEFAULT_UDP_STREAM_PORT = os.getenv('DEFAULT_UDP_STREAM_PORT') or '9999'
+DEFAULT_AUDIO_STREAM_URL = os.getenv('DEFAULT_AUDIO_STREAM_URL') or '192.168.1.101'
+DEFAULT_AUDIO_STREAM_PORT = os.getenv('DEFAULT_AUDIO_STREAM_PORT') or '5004'
+DEFAULT_WEB_CONTROLLER_URL = os.getenv('DEFAULT_WEB_CONTROLLER_URL') or None
 
 # openai
 MODEL_NAME = os.getenv('MODEL_NAME')
@@ -99,12 +100,15 @@ def main():
     parser.add_option("--socket-port",
         help="Port of the server running the pepper-controller.",
         dest="socket_port")
-    parser.add_option("--udp-stream-host",
-        help="Host for UDP audio streaming (like externalAudioStreamTest.py).",
-        dest="udp_stream_host")
-    parser.add_option("--udp-stream-port",
-        help="Port for UDP audio streaming.",
-        dest="udp_stream_port")
+    parser.add_option("--audio-stream-url",
+        help="URL for audio streaming.",
+        dest="audio_stream_url")
+    parser.add_option("--audio-stream-port",
+        help="Port for audio streaming.",
+        dest="audio_stream_port")
+    parser.add_option("--web-controller-url",
+        help="Base URL of the web controller (serves as both socket and audio stream URL unless overridden).",
+        dest="web_controller_url")
     parser.set_defaults(
         volume=DEFAULT_VOLUME,
         ip=NAO_IP,
@@ -124,8 +128,9 @@ def main():
         webview=WEBVIEW,
         socket_url=DEFAULT_SOCKET_URL,
         socket_port=DEFAULT_SOCKET_PORT,
-        udp_stream_host=DEFAULT_UDP_STREAM_HOST,
-        udp_stream_port=DEFAULT_UDP_STREAM_PORT
+        audio_stream_url=DEFAULT_AUDIO_STREAM_URL,
+        audio_stream_port=DEFAULT_AUDIO_STREAM_PORT,
+        web_controller_url=DEFAULT_WEB_CONTROLLER_URL
     )
 
     opts = parser.parse_args()[0]
@@ -147,8 +152,30 @@ def main():
     webview = opts.webview
     socket_url = opts.socket_url
     socket_port = opts.socket_port
-    udp_stream_host = opts.udp_stream_host
-    udp_stream_port = opts.udp_stream_port
+    audio_stream_url = opts.audio_stream_url
+    audio_stream_port = opts.audio_stream_port
+    web_controller_url = opts.web_controller_url
+
+    # URL resolution logic
+    # 1. If web controller URL is provided, use it as base for both socket and audio streaming
+    # 2. Specific socket_url or audio_stream_url override the web controller URL
+    if web_controller_url:
+        print("Using web controller URL: {}".format(web_controller_url))
+        
+        # Use web controller URL for socket if not specifically overridden
+        if socket_url == DEFAULT_SOCKET_URL:
+            socket_url = web_controller_url
+            print("Socket URL set from web controller: {}".format(socket_url))
+        
+        # Use web controller URL for audio streaming if not specifically overridden
+        if audio_stream_url == DEFAULT_AUDIO_STREAM_URL:
+            audio_stream_url = web_controller_url
+            print("Audio stream URL set from web controller: {}".format(audio_stream_url))
+
+    # Display final configuration
+    print("Final configuration:")
+    print("  Socket URL: {}:{}".format(socket_url, socket_port))
+    print("  Audio Stream: {}:{}".format(audio_stream_url, audio_stream_port))
 
     # if not server_url:
     #     print('Error: Services route not specified!')
@@ -293,11 +320,11 @@ def main():
     global Exploration
     Exploration = ExploringModule("Exploration")    
 
-    # Initialize UDP audio streaming module with precise configuration
+    # Initialize GStreamer audio streaming module with resolved URLs
     global AudioStream
     AudioStream = AudioStreamModule(
         "AudioStream", ip, port,
-        udp_stream_host, toint(udp_stream_port)
+        audio_stream_url, toint(audio_stream_port)
     )
 
     socket_client = SocketClient(socket_url, toint(socket_port))
