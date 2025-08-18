@@ -89,11 +89,21 @@ class AudioStreamModule(ALModule):
         try:
             # Create GStreamer pipeline description
             pipeline_desc = (
-                "alsasrc device=default ! "
-                "audio/x-raw-int,rate=44100,channels=2,width=16,depth=16 ! "
+                "alsasrc device=default "
+                "blocksize=4096 "
+                "latency-time=30000 ! "  # 30ms latency
+                "audio/x-raw-int,rate=44100,channels=1,width=16,depth=16 ! "
                 "audioconvert ! "
-                "rtpL16pay ! "
-                "udpsink host=%s port=%d"
+                "queue "
+                "max-size-buffers=20 "
+                "max-size-time=300000000 "
+                "leaky=downstream ! "
+                "rtpL16pay "
+                "mtu=1200 "
+                "pt=96 ! "
+                "udpsink host=%s port=%d "
+                "sync=false "
+                "async=false"
             ) % (self.target_host, self.target_port)
             
             print("AUDIO: Creating GStreamer pipeline: %s" % pipeline_desc)
