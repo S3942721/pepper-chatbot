@@ -38,15 +38,6 @@ class SocketClient(threading.Thread):
             self.client_socket.close()
             self.connected = False
 
-    def enable_audio_streaming(self):
-        """Enable audio streaming via UDP AudioStreamModule"""
-        print("Enabling UDP audio streaming via AudioStreamModule")
-        self.memory.raiseEvent("ControlUDPAudioStreaming", True)
-
-    def disable_audio_streaming(self):
-        """Disable audio streaming via UDP AudioStreamModule"""
-        print("Disabling UDP audio streaming via AudioStreamModule")
-        self.memory.raiseEvent("ControlUDPAudioStreaming", False)
 
     def run(self):
         buffer = ""
@@ -83,11 +74,7 @@ class SocketClient(threading.Thread):
     def process_message(self, json_data):
         print("Received message: {}".format(json_data))
         try:
-            if json_data['type'] == 'enable_audio_stream':
-                self.enable_audio_streaming()
-            elif json_data['type'] == 'disable_audio_stream':
-                self.disable_audio_streaming()
-            elif json_data['type'] == 'script':
+            if json_data['type'] == 'script':
                 msg = str(json_data['message'])
                 if msg:
                     self.memory.raiseEvent('StopAction', None)
