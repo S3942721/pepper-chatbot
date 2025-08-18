@@ -39,7 +39,7 @@ MODEL_NAME = os.getenv('MODEL_NAME')
 API_KEY = os.getenv('API_KEY')
 SPEECH_API_KEY = os.getenv('SPEECH_API_KEY') or API_KEY
 
-WEBVIEW = os.getenv('WEBVIEW') or ''
+WEBVIEW = os.getenv('WEBVIEW') or "http://198.18.0.1/apps/rmit-race/event-agenda-ltq.html"
 
 def main():
     parser = OptionParser()
@@ -244,7 +244,7 @@ def main():
 
     speech_recoginition_url = os.getenv('SPEECH_RECOGINITION_URL') or server_url
 
-    # Initialize speech recognition module for audio streaming
+    # Initialize speech recognition module with proper audio configuration
     global SpeechRecognition
     SpeechRecognition = SpeechRecognitionModule(
         "SpeechRecognition", ip, port,
@@ -285,7 +285,7 @@ def main():
 
     # if webview:
     global HealthyCheck
-    HealthyCheck = HealthyCheckModule("HealthyCheck")
+    HealthyCheck = HealthyCheckModule("HealthyCheck", webview_url=webview)
     
     global Motion
     Motion = MotionModule("Motion", ip, port)
@@ -293,7 +293,7 @@ def main():
     global Exploration
     Exploration = ExploringModule("Exploration")    
 
-    # Initialize UDP audio streaming module
+    # Initialize UDP audio streaming module with precise configuration
     global AudioStream
     AudioStream = AudioStreamModule(
         "AudioStream", ip, port,
@@ -310,7 +310,8 @@ def main():
     # memory.raiseEvent("Say", "^run(helicopter) $EyeColour=red $Sound=get_to_the_choppa $EyeColour=red")
 
     # Load the default HTML for logo
-    memory.raiseEvent("LoadHTML", "http://198.18.0.1/apps/rmit-race/event-agenda-ltq.html")
+    memory.raiseEvent("LoadHTML", webview)
+    # memory.raiseEvent("LoadHTML", "http://198.18.0.1/apps/rmit-race/event-agenda-ltq.html")
     print("I am alive.")
 
     try:
