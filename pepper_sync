@@ -231,13 +231,18 @@ def sync_files(target, sync_html=False, sync_hands_above_head=False, sync_media=
     try:
         print("Syncing main source folder...")
         
-        if sync_media:
-            # Copy the entire local folder including media
-            run_command(['scp', '-r', f'{LOCAL_FOLDER}/.', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
-        else:
-            if use_rsync:
+        if use_rsync:
+            if sync_media:
+                # Copy everything including media using rsync
+                run_command(['rsync', '-av', f'{LOCAL_FOLDER}/', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
+            else:
                 # Copy everything except the media folder using rsync
                 run_command(['rsync', '-av', '--exclude=media', f'{LOCAL_FOLDER}/', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
+        else:
+            # Using scp
+            if sync_media:
+                # Copy the entire local folder including media
+                run_command(['scp', '-r', f'{LOCAL_FOLDER}/.', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
             else:
                 # Copy everything except the media folder using scp
                 # First create a temporary directory without media
@@ -249,7 +254,11 @@ def sync_files(target, sync_html=False, sync_hands_above_head=False, sync_media=
                     shutil.copytree(LOCAL_FOLDER, temp_src, ignore=shutil.ignore_patterns('media'))
                     run_command(['scp', '-r', f'{temp_src}/.', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
         
-        print("✓ Main folder sync completed")
+        if sync_media:
+            print("✓ Main folder sync completed (including media)")
+        else:
+            print("✓ Main folder sync completed (excluding media)")
+            
     except Exception as e:
         print(f"Failed to copy local folder to remote system: {e}")
         return False
@@ -266,18 +275,6 @@ def sync_files(target, sync_html=False, sync_hands_above_head=False, sync_media=
             print("✓ HTML files sync completed")
         except Exception as e:
             print(f"Failed to copy HTML files: {e}")
-    
-    if sync_media and os.path.exists(LOCAL_MEDIA_FOLDER):
-        try:
-            print("Syncing media folder... (this may take a while)")
-            # Create the remote media directory if it does not exist
-            run_command(['ssh', target, f'mkdir -p {REMOTE_MEDIA_FOLDER}'], capture_output=True)
-            
-            # Copy the local media folder to the remote system - show progress
-            run_command(['scp', '-r', f'{LOCAL_MEDIA_FOLDER}/.', f'{target}:{REMOTE_MEDIA_FOLDER}'], capture_output=False)
-            print("✓ Media folder sync completed")
-        except Exception as e:
-            print(f"Failed to copy media folder: {e}")
     
     if sync_hands_above_head and os.path.exists(LOCAL_HANDS_ABOVE_HEAD_FOLDER):
         try:
@@ -419,4 +416,11 @@ if __name__ == "__main__":
             set_pepper_ip()
     else:
         # Running as pepper_sync
-        main()
+        try:
+            main()
+        # catch keyboard interrupt to exit gracefully
+        except KeyboardInterrupt:
+            print("\nExiting...")
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error occurred in main: {e}")
