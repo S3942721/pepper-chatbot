@@ -15,15 +15,14 @@ class SocketClient(threading.Thread):
         self.connected = False
         self.running = True
         
-        # Audio streaming variables
-        self.audio_streaming_enabled = False
-        self.audio_send_lock = threading.Lock()
-        self.speech_module = None  # Direct reference to speech recognition module
+        # Remove audio streaming from socket client - now handled by dedicated UDP module
+        # Audio streaming is now handled by AudioStreamModule via UDP
+        self.speech_module = None  # Keep reference for compatibility
 
         self.memory = ALProxy("ALMemory")
 
     def set_speech_module(self, speech_module):
-        """Set reference to the speech recognition module"""
+        """Keep method for compatibility but audio streaming now uses dedicated UDP module"""
         self.speech_module = speech_module
         print("Speech module reference set in socket client")
 
@@ -40,70 +39,14 @@ class SocketClient(threading.Thread):
             self.connected = False
 
     def enable_audio_streaming(self):
-        """Enable audio streaming through the socket connection"""
-        if not self.audio_streaming_enabled and self.speech_module:
-            self.audio_streaming_enabled = True
-            # Set this instance as the callback directly in the speech module
-            self.speech_module.audioStreamCallback = self.send_audio_chunk
-            self.speech_module.isStreamingEnabled = True
-            self.speech_module.streamBuffer = []
-            print("Audio streaming enabled via socket - callback set directly")
-        elif not self.speech_module:
-            print("ERROR: Speech module reference not set - cannot enable audio streaming")
+        """Enable audio streaming via UDP AudioStreamModule"""
+        print("Enabling UDP audio streaming via AudioStreamModule")
+        self.memory.raiseEvent("ControlUDPAudioStreaming", True)
 
     def disable_audio_streaming(self):
-        """Disable audio streaming"""
-        if self.audio_streaming_enabled and self.speech_module:
-            self.audio_streaming_enabled = False
-            self.speech_module.isStreamingEnabled = False
-            self.speech_module.audioStreamCallback = None
-            self.speech_module.streamBuffer = []
-            print("Audio streaming disabled")
-
-    def send_audio_chunk(self, audio_data):
-        """Send audio chunk through socket with proper framing"""
-        if not self.connected or not self.audio_streaming_enabled:
-            print("DEBUG: Cannot send audio - connected: {}, streaming: {}".format(
-                self.connected, self.audio_streaming_enabled))
-            return
-            
-        try:
-            with self.audio_send_lock:
-                # Convert numpy array to bytes if needed
-                if isinstance(audio_data, np.ndarray):
-                    audio_bytes = audio_data.astype(np.int16).tostring()
-                elif isinstance(audio_data, list):
-                    # Convert list to numpy array then to bytes
-                    audio_bytes = np.array(audio_data, dtype=np.int16).tostring()
-                else:
-                    print("ERROR: Unknown audio data type: {}".format(type(audio_data)))
-                    return
-                
-                print("DEBUG: Sending audio chunk - {} bytes".format(len(audio_bytes)))
-                
-                # Create audio packet with header
-                packet = {
-                    'type': 'audio_stream',
-                    'sample_rate': 48000,
-                    'channels': 1,
-                    'format': 'int16',
-                    'data_length': len(audio_bytes)
-                }
-                
-                # Send JSON header first
-                header_json = json.dumps(packet) + '\n'
-                self.client_socket.sendall(header_json.encode('utf-8'))
-                
-                # Send raw audio data
-                self.client_socket.sendall(audio_bytes)
-                print("DEBUG: Audio packet sent successfully")
-                
-        except socket.error as e:
-            print("Error sending audio data: {}".format(e))
-            self.connected = False
-            self.disable_audio_streaming()
-        except Exception as e:
-            print("Unexpected error in send_audio_chunk: {}".format(e))
+        """Disable audio streaming via UDP AudioStreamModule"""
+        print("Disabling UDP audio streaming via AudioStreamModule")
+        self.memory.raiseEvent("ControlUDPAudioStreaming", False)
 
     def run(self):
         buffer = ""
@@ -152,7 +95,7 @@ class SocketClient(threading.Thread):
 
             elif json_data['type'] == 'profile':
                 if 'html' in json_data['message']:
-                    self.memory.raiseEvent("LoadHTML", "http://198.18.0.1/apps/rmit-race/" + str(json_data['message']['html']))
+                    self.memory.raiseEvent("LoadHTML","http://10.234.7.62:3000/")
                 if 'flags' in json_data['message']:
                     if 'gap_fill' in json_data['message']['flags']:
                         self.memory.raiseEvent("TriggerGapFill", bool(json_data['message']['flags']['gap_fill']))

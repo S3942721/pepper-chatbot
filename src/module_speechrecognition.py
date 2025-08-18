@@ -150,7 +150,7 @@ class SpeechRecognitionModule(ALModule):
         audio = ALProxy("ALAudioDevice")
         audio.unsubscribe(self.getName())
 
-        # print("INF: SpeechRecognitionModule: stopped!")
+        print("INF: SpeechRecognitionModule: paused!")
 
     def stop( self ):
         self.pause()
@@ -179,7 +179,9 @@ class SpeechRecognitionModule(ALModule):
         # self.memory.raiseEvent("ResetConversation", True)
 
     def toggle_status(self):
-        if self.eye_contact and not self.is_speaking and self.is_allowed_recording:
+        # TODO: Refactor for constant audio streaming without parsing pepper's speach to llm
+        # if self.eye_contact and not self.is_speaking and self.is_allowed_recording:
+        if self.is_allowed_recording:
             self.start()
         else:
             self.pause()
