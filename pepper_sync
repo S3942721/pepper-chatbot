@@ -11,6 +11,7 @@ import shutil
 # Constants
 DEFAULT_IP = "192.168.1.100"
 REMOTE_USER = "nao"
+DEFAULT_HOSTNAME = "haku.local"
 REMOTE_FOLDER = "/home/nao/pepperchat"
 LOCAL_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 HTML_FILES = glob.glob(os.path.join(os.path.dirname(LOCAL_FOLDER), "*.html"))
@@ -99,9 +100,54 @@ def get_current_config_ip():
     except Exception:
         return None
 
-def update_ssh_config(ip):
-    """Update SSH config with new IP for pepper robot."""
-    print(f"Updating SSH config for {HOST_NAME} -> {ip}")
+def validate_ip_or_hostname(address):
+    """Validate IP address format or return True for hostname."""
+    # Check if it's an IP address
+    ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+    if re.match(ip_pattern, address):
+        # Validate IP address octets
+        octets = address.split('.')
+        return all(0 <= int(octet) <= 255 for octet in octets)
+    else:
+        # Assume it's a hostname - basic validation
+        hostname_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$'
+        print("⚠️  WARNING: Using hostname directly may be slower than IP address or SSH config!")
+        return re.match(hostname_pattern, address) is not None
+
+def set_pepper_ip(address=None):
+    """Standalone function to set pepper IP/hostname in SSH config."""
+    if not address:
+        current_ip = get_current_config_ip()
+        print("Set Pepper Robot IP Address or Hostname")
+        print("=" * 40)
+        if current_ip:
+            print(f"Current address: {current_ip}")
+        else:
+            print("No current configuration found")
+        
+        while True:
+            address = input("Enter new IP address or hostname: ").strip()
+            if validate_ip_or_hostname(address):
+                break
+            print("Invalid IP address or hostname format. Please try again.")
+    
+    if not validate_ip_or_hostname(address):
+        print(f"Error: Invalid IP address or hostname format: {address}")
+        return False
+    
+    update_ssh_config(address)
+    
+    # Test connection
+    if test_connection(HOST_NAME):
+        print("✓ Connection test successful!")
+        return True
+    else:
+        print("✗ Connection test failed. Please check if the robot is online.")
+        return False
+
+def update_ssh_config(address):
+    """Update SSH config with new IP/hostname for pepper robot."""
+    print(f"Updating SSH config for {HOST_NAME} -> {address}")
     
     # Create SSH config if it doesn't exist
     if not os.path.exists(SSH_CONFIG_FILE):
@@ -129,7 +175,7 @@ def update_ssh_config(ip):
                 in_pepper_host = False
                 new_lines.append(line)
             elif in_pepper_host and line.strip().startswith('HostName'):
-                new_lines.append(f"    HostName {ip}")
+                new_lines.append(f"    HostName {address}")
             else:
                 new_lines.append(line)
         
@@ -141,7 +187,7 @@ def update_ssh_config(ip):
         
         config_content += f"""
 Host {HOST_NAME}
-    HostName {ip}
+    HostName {address}
     User {REMOTE_USER}
     IdentityFile {SSH_KEY_FILE}
 """
@@ -152,45 +198,99 @@ Host {HOST_NAME}
     
     print(f"✓ SSH config updated. You can now use: ssh {HOST_NAME}")
 
-def set_pepper_ip(ip=None):
-    """Standalone function to set pepper IP in SSH config."""
-    if not ip:
-        current_ip = get_current_config_ip()
-        print("Set Pepper Robot IP Address")
-        print("=" * 30)
-        if current_ip:
-            print(f"Current IP: {current_ip}")
-        else:
-            print("No current configuration found")
+
+# def update_ssh_config(ip):
+#     """Update SSH config with new IP for pepper robot."""
+#     print(f"Updating SSH config for {HOST_NAME} -> {ip}")
+    
+#     # Create SSH config if it doesn't exist
+#     if not os.path.exists(SSH_CONFIG_FILE):
+#         os.makedirs(os.path.dirname(SSH_CONFIG_FILE), exist_ok=True)
+#         open(SSH_CONFIG_FILE, 'a').close()
+#         os.chmod(SSH_CONFIG_FILE, 0o600)
+    
+#     # Read current config
+#     with open(SSH_CONFIG_FILE, 'r') as f:
+#         config_content = f.read()
+    
+#     # Check if pepper-robot host already exists
+#     host_pattern = f"Host {HOST_NAME}"
+#     if host_pattern in config_content:
+#         # Update existing configuration
+#         lines = config_content.split('\n')
+#         new_lines = []
+#         in_pepper_host = False
         
-        while True:
-            ip = input("Enter new IP address: ").strip()
-            if validate_ip(ip):
-                break
-            print("Invalid IP address format. Please try again.")
+#         for line in lines:
+#             if line.strip() == f"Host {HOST_NAME}":
+#                 in_pepper_host = True
+#                 new_lines.append(line)
+#             elif line.startswith('Host ') and in_pepper_host:
+#                 in_pepper_host = False
+#                 new_lines.append(line)
+#             elif in_pepper_host and line.strip().startswith('HostName'):
+#                 new_lines.append(f"    HostName {ip}")
+#             else:
+#                 new_lines.append(line)
+        
+#         config_content = '\n'.join(new_lines)
+#     else:
+#         # Add new configuration
+#         if config_content and not config_content.endswith('\n'):
+#             config_content += '\n'
+        
+#         config_content += f"""
+# Host {HOST_NAME}
+#     HostName {ip}
+#     User {REMOTE_USER}
+#     IdentityFile {SSH_KEY_FILE}
+# """
     
-    if not validate_ip(ip):
-        print(f"Error: Invalid IP address format: {ip}")
-        return False
+#     # Write updated config
+#     with open(SSH_CONFIG_FILE, 'w') as f:
+#         f.write(config_content)
     
-    update_ssh_config(ip)
+#     print(f"✓ SSH config updated. You can now use: ssh {HOST_NAME}")
+
+# def set_pepper_ip(ip=None):
+#     """Standalone function to set pepper IP in SSH config."""
+#     if not ip:
+#         current_ip = get_current_config_ip()
+#         print("Set Pepper Robot IP Address")
+#         print("=" * 30)
+#         if current_ip:
+#             print(f"Current IP: {current_ip}")
+#         else:
+#             print("No current configuration found")
+        
+#         while True:
+#             ip = input("Enter new IP address: ").strip()
+#             if validate_ip(ip):
+#                 break
+#             print("Invalid IP address format. Please try again.")
     
-    # Test connection
-    if test_connection(HOST_NAME):
-        print("✓ Connection test successful!")
-        return True
-    else:
-        print("✗ Connection test failed. Please check if the robot is online.")
-        return False
+#     if not validate_ip(ip):
+#         print(f"Error: Invalid IP address format: {ip}")
+#         return False
+    
+#     update_ssh_config(ip)
+    
+#     # Test connection
+#     if test_connection(HOST_NAME):
+#         print("✓ Connection test successful!")
+#         return True
+#     else:
+#         print("✗ Connection test failed. Please check if the robot is online.")
+#         return False
 
 def test_connection(target):
     """Test SSH connection to the target."""
     print(f"Testing connection to {target}...")
     try:
         result = subprocess.run([
-            'ssh', '-o', 'ConnectTimeout=5', '-o', 'BatchMode=yes',
+            'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes',
             target, 'exit'
-        ], capture_output=True, timeout=10)
+        ], capture_output=True, timeout=15)
         
         if result.returncode == 0:
             print("✓ Connection successful!")
@@ -204,10 +304,6 @@ def test_connection(target):
 
 def sync_files(target, sync_html=False, sync_hands_above_head=False, sync_media=False, delete_remote=False, use_scp=False):
     """Sync files to the pepper robot."""
-    
-    if not test_connection(target):
-        print("Cannot establish connection. Aborting sync.")
-        return False
     
     # Check if rsync is available and decide which method to use
     rsync_available = check_rsync_available()
@@ -299,6 +395,8 @@ def main():
 Examples:
   %(prog)s                          # Sync to current SSH config
   %(prog)s 192.168.1.50             # Sync to specific IP
+  %(prog)s --hostname               # Sync to haku.local
+  %(prog)s --hostname haku.local    # Sync to specific hostname
   %(prog)s --all                    # Sync everything including media (no confirmation)
   %(prog)s -H -b                    # Sync HTML and hands-above-head behavior
   %(prog)s --set-ip 10.0.0.5        # Set IP in SSH config
@@ -309,6 +407,10 @@ Examples:
     
     parser.add_argument("ip", nargs="?", default=None,
                        help=f"Remote IP address (default: use SSH config or {DEFAULT_IP})")
+    
+    # Add hostname argument
+    parser.add_argument("--hostname", nargs="?", const=DEFAULT_HOSTNAME, default=None,
+                       help=f"Use hostname instead of SSH config (default: {DEFAULT_HOSTNAME})")
     
     # Sync options (media is now opt-in due to large files)
     parser.add_argument("-H", "--html", action="store_true",
@@ -340,9 +442,21 @@ Examples:
             set_pepper_ip()
         return
     
-    # Determine target (IP or SSH alias)
-    if args.ip:
-        if not validate_ip(args.ip):
+    # Validate that only one connection method is specified
+    connection_methods = sum([bool(args.ip), bool(args.hostname)])
+    if connection_methods > 1:
+        print("Error: Please specify only one connection method (IP address or hostname)")
+        sys.exit(1)
+    
+    # Determine target (IP, hostname, or SSH alias)
+    if args.hostname:
+        # Use hostname
+        target = f"{REMOTE_USER}@{args.hostname}"
+        print(f"Using hostname: {args.hostname}")
+        print("⚠️  WARNING: Using hostname directly may be slower than IP address or SSH config!")
+    elif args.ip:
+        # Use IP address
+        if not validate_ip_or_hostname(args.ip):
             print(f"Error: Invalid IP address format: {args.ip}")
             sys.exit(1)
         
@@ -369,13 +483,16 @@ Examples:
             print("SSH config connection failed, falling back to direct IP")
             target = f"{REMOTE_USER}@{target_ip}"
     else:
-        # No IP provided, try SSH config first, then default IP
+        # No IP or hostname provided, try SSH config first, then hostname, then default IP
         if test_connection(HOST_NAME):
             target = HOST_NAME
             print(f"Using SSH config: {HOST_NAME}")
+        elif test_connection(f"{REMOTE_USER}@{DEFAULT_HOSTNAME}"):
+            target = f"{REMOTE_USER}@{DEFAULT_HOSTNAME}"
+            print(f"SSH config not available, using hostname: {DEFAULT_HOSTNAME}")
         else:
             target = f"{REMOTE_USER}@{DEFAULT_IP}"
-            print(f"SSH config not available, using default IP: {DEFAULT_IP}")
+            print(f"SSH config and hostname not available, using default IP: {DEFAULT_IP}")
     
     # If --all is specified, enable all sync options
     if args.all:
@@ -405,7 +522,6 @@ Examples:
     else:
         print("\n✗ Sync failed!")
         sys.exit(1)
-
 if __name__ == "__main__":
     # Check if script is being called as set-pepper-ip
     if len(sys.argv) > 0 and 'set-pepper-ip' in sys.argv[0]:
