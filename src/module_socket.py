@@ -67,7 +67,6 @@ class SocketClient(threading.Thread):
                 print("Socket error:", e)
                 self.connected = False
                 self.client_socket.close()
-                self.disable_audio_streaming()
         if self.running:
             self.run()
 
@@ -125,7 +124,6 @@ class SocketClient(threading.Thread):
 
     def join(self, timeout=None):
         self.running = False
-        self.disable_audio_streaming()
         self.client_socket.sendall('SHUTDOWN'.encode('utf-8'))
         self.client_socket.close()
         print("Connection closed")

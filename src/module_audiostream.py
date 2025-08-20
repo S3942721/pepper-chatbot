@@ -21,6 +21,11 @@ class AudioStreamModule(ALModule):
     """
 
     def __init__(self, strModuleName, strNaoIp, port, target_host, target_port):
+        
+        global global_speaking_state
+        global_speaking_state = False  # Initialize speaking state
+        
+        self.led_service = ALProxy('ALLeds')
         try:
             ALModule.__init__(self, strModuleName)
             
@@ -39,6 +44,7 @@ class AudioStreamModule(ALModule):
             # Audio streaming state
             self.isStarted = False
             self.isStreamingEnabled = False
+            self.isSpeaking = False  # Track speaking state
             
             # Statistics
             self.stream_start_time = 0
@@ -50,6 +56,7 @@ class AudioStreamModule(ALModule):
             # Memory setup
             self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
             self.memory.subscribeToEvent("ControlUDPAudioStreaming", self.getName(), "control_streaming")
+            self.memory.subscribeToEvent("Speaking", self.getName(), "on_speaking_event")
             
         except BaseException as err:
             print("ERR: AudioStreamModule: loading error: %s" % str(err))
@@ -220,6 +227,66 @@ class AudioStreamModule(ALModule):
         else:
             self.disable_stream()
 
+    def on_speaking_event(self, _, is_speaking):
+        """Handle speaking state changes to pause/resume audio streaming"""
+        is_speaking = bool(is_speaking)
+        
+        print("AUDIO: Speaking event received - value: {}, current state: {}".format(
+            is_speaking, self.isSpeaking))
+        
+        # Only process if state actually changed
+        if self.isSpeaking != is_speaking:
+            self.isSpeaking = is_speaking
+            global_speaking_state = self.isSpeaking  # Update global speaking state
+            
+            if self.isSpeaking:
+                # Subscribe to end of speech event
+                self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "stopped_speaking")
+                self.led_service.fadeRGB("FaceLeds", 0xFF0000, 0.1)
+                
+                print("AUDIO: Speaking detected - pausing audio stream")
+                # Temporarily pause the pipeline without stopping it completely
+                if self.pipeline and self.gstreamer_available and self.isStreamingEnabled:
+                    try:
+                        # Pause the pipeline instead of stopping it
+                        self.pipeline.set_state(self.gst.STATE_PAUSED)
+                        print("AUDIO: Pipeline paused successfully")
+                    except Exception as e:
+                        print("ERR: Failed to pause GStreamer pipeline: %s" % e)
+            else:
+                print("AUDIO: Speaking ended via direct event - resuming audio stream")
+                self.resume_audio_stream()
+    
+    def resume_audio_stream(self):
+        """Resume audio streaming after speaking ends"""
+        try:
+            # Unsubscribe from the event if subscribed
+            try:
+                self.memory.unsubscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName())
+            except:
+                pass  # May not be subscribed
+            
+            self.led_service.fadeRGB("FaceLeds", 0x00FF00, 0.1)
+            
+            if self.pipeline and self.gstreamer_available and self.isStreamingEnabled:
+                try:
+                    # Resume the pipeline
+                    self.pipeline.set_state(self.gst.STATE_PLAYING)
+                    print("AUDIO: Pipeline resumed successfully")
+                except Exception as e:
+                    print("ERR: Failed to resume GStreamer pipeline: %s" % e)
+        except Exception as e:
+            print("ERR: Error in resume_audio_stream: %s" % e)
+
+    def stopped_speaking(self, _, value=None):
+        """Handle end of animated speech event to resume audio streaming"""
+        print("AUDIO: End of animated speech detected - resuming audio stream")
+        
+        self.isSpeaking = False
+        global_speaking_state = self.isSpeaking  # Update global speaking state
+        
+        self.resume_audio_stream()
+
     def enable_stream(self):
         """Enable audio streaming using GStreamer"""
         if self.isStreamingEnabled:
@@ -241,6 +308,15 @@ class AudioStreamModule(ALModule):
         if self.start_gstreamer_pipeline():
             self.isStreamingEnabled = True
             self.network_errors = 0
+            
+            # If currently speaking, start in paused state
+            if self.isSpeaking:
+                print("AUDIO: Starting in paused state due to active speaking")
+                try:
+                    self.pipeline.set_state(self.gst.STATE_PAUSED)
+                except Exception as e:
+                    print("ERR: Failed to pause pipeline on start: %s" % e)
+            
             print("CONTROL: Audio streaming ENABLED - {}:{} (GStreamer RTP/L16)".format(
                 self.target_host, self.target_port))
         else:
@@ -271,9 +347,10 @@ class AudioStreamModule(ALModule):
             self.enable_stream()
 
     def get_streaming_status(self):
-        """Get current streaming status"""
+        """Get current streaming status including speaking state"""
         return {
             'streaming': self.isStreamingEnabled,
+            'speaking': self.isSpeaking,
             'gstreamer_available': self.check_gstreamer_availability(),
             'target': "{}:{}".format(self.target_host, self.target_port),
             'network_errors': self.network_errors,
