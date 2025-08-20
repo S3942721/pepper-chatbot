@@ -29,9 +29,9 @@ class HealthyCheckModule(ALModule):
         self.memory.raiseEvent("HealthyCheck", "ping")
         self.got_pong = False
         self.got_pong = self.tablet_service.preLoadImage(self.webview_url)
-        print("Getting pong")
+        # print("Getting pong")
         time.sleep(10)
-        print("Got pong: {}".format(self.got_pong))
+        # print("Got pong: {}".format(self.got_pong))
         if not self.got_pong:
             print("No pong from tablet, reloading webview")
             self.tablet_service.preLoadImage(self.webview_url)

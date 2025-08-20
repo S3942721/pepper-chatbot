@@ -76,9 +76,12 @@ class SocketClient(threading.Thread):
             if json_data['type'] == 'script':
                 msg = str(json_data['message'])
                 if msg:
-                    self.memory.raiseEvent('StopAction', None)
+                    # self.memory.raiseEvent('StopAction', None) # TODO: revisit how to cancel existing actions before running a new item
                     self.memory.raiseEvent('Say', msg)
-
+            elif json_data['type'] == 'conversation-response':
+                msg = str(json_data['message'])
+                if msg:
+                    self.memory.raiseEvent('SayChunk', msg)
             elif json_data['type'] == 'profile':
                 if 'html' in json_data['message']:
                     self.memory.raiseEvent("LoadHTML","http://10.234.7.62:3000/")
@@ -93,7 +96,7 @@ class SocketClient(threading.Thread):
                         self.memory.raiseEvent(signal, value)
             elif json_data['type'] == 'shortcut':
                 if json_data['message']:
-                    self.memory.raiseEvent('StopAction', None)
+                    # self.memory.raiseEvent('StopAction', None) # TODO: revisit how to cancel existing actions before running a new item
                     self.memory.raiseEvent('Say', str(json_data['message']))
             elif json_data['type'] == 'trigger-all':
                 for item in json_data['message']:

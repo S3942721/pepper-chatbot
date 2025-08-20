@@ -241,6 +241,7 @@ def main():
     memory.declareEvent("TriggerGapFill")
     memory.declareEvent("Say")
     memory.declareEvent("JSONSay")
+    memory.declareEvent("SayChunk")
     memory.declareEvent("ControlGreetings")
     memory.declareEvent("GreetingsRequireFaceLost")
     memory.declareEvent("StopSpeech")
@@ -326,7 +327,7 @@ def main():
         "AudioStream", ip, port,
         audio_stream_url, toint(audio_stream_port)
     )
-
+    
     socket_client = SocketClient(socket_url, toint(socket_port))
     # Connect speech recognition module to socket client for audio streaming
     socket_client.set_speech_module(SpeechRecognition)
