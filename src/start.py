@@ -342,6 +342,9 @@ def main():
     # memory.raiseEvent("LoadHTML", "http://198.18.0.1/apps/rmit-race/event-agenda-ltq.html")
     print("I am alive.")
 
+    print("Add empty say to spawn speech threads")
+    memory.raiseEvent("Say", "")
+
     try:
         while True:
             time.sleep(1)
