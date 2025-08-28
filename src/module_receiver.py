@@ -223,9 +223,6 @@ class BaseSpeechReceiverModule(ALModule):
         finally:
             print( "INF: ReceiverModule: stopped!" )
 
-    def version( self ):
-        return "1.1"
-    
     def trigger_gap_fill(self, _, value):
         self.disable_thinking = not value
 
