@@ -263,7 +263,7 @@ def main():
     memory.declareEvent("ControlExploration")
     memory.declareEvent("ControlWandering")
     memory.declareEvent("LockHead")
-    memory.declareEvent("ControlUDPAudioStreaming")
+    memory.declareEvent("ControlAudioStreaming")
 
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)

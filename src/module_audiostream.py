@@ -55,7 +55,7 @@ class AudioStreamModule(ALModule):
             
             # Memory setup
             self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
-            self.memory.subscribeToEvent("ControlUDPAudioStreaming", self.getName(), "control_streaming")
+            self.memory.subscribeToEvent("ControlAudioStreaming", self.getName(), "control_streaming")
             self.memory.subscribeToEvent("Speaking", self.getName(), "on_speaking_event")
             
         except BaseException as err:
