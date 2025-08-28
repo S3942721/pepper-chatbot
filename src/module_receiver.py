@@ -203,7 +203,8 @@ class BaseSpeechReceiverModule(ALModule):
             print("DEBUG: Speaking False raised (no queued messages)")
         else:
             # Keep Speaking True while queued items remain; worker will handle next item.
-            print("DEBUG: Speaking remains True ({} queued)".format(self.message_queue.qsize()))
+            print("DEBUG: Speaking remains True ({} queued) - keeping audio paused".format(self.message_queue.qsize()))
+            # Don't raise Speaking False event - keep audio stream paused
 
     def stop_speech(self, _, value):
         print("DEBUG: Stop speech event received")
@@ -412,6 +413,16 @@ class BaseSpeechReceiverModule(ALModule):
                 
                 # Process as regular message
                 self.process_message_directly(signal_name, message)
+            
+            # Check if this was the last message in the queue
+            try:
+                with self.queue_lock:
+                    queue_empty_after_processing = self.message_queue.empty()
+                if queue_empty_after_processing and not self.is_currently_speaking:
+                    print("DEBUG: Queue empty after processing, ensuring Speaking False")
+                    self.memory.raiseEvent("Speaking", False)
+            except Exception:
+                pass
                 
         except Exception as e:
             print("ERR: Error processing queued message: {}".format(e))
@@ -419,11 +430,9 @@ class BaseSpeechReceiverModule(ALModule):
     def handle_chunked_speech(self, message, speech_id):
         """Handle chunked speech responses"""
         try:
-            # Set speaking state immediately
-            if not self.is_currently_speaking:
-                self.is_currently_speaking = True
-                self.memory.raiseEvent("Speaking", True)
-                print("DEBUG: Speaking True set for chunked speech")
+            # Don't set speaking state here - it should already be True from previous chunks
+            # or will be set in process_speech_response
+            print("DEBUG: Handling chunked speech for session: {}".format(speech_id))
             
             # Process the message chunk
             self.process_speech_chunk(message)
@@ -661,13 +670,16 @@ class BaseSpeechReceiverModule(ALModule):
                 self.memory.raiseEvent("RunningBehaviour", True)
                 
                 # Mark speaking state and notify other modules (e.g. audio stream) BEFORE speaking
+                # Only set Speaking True if not already speaking (to avoid audio stream toggle)
                 if not self.is_currently_speaking:
                     self.is_currently_speaking = True
                     try:
                         self.memory.raiseEvent("Speaking", True)
+                        print("DEBUG: Speaking True set for speech response")
                     except Exception:
                         pass
-                    print("DEBUG: Speaking True set for speech response")
+                else:
+                    print("DEBUG: Already speaking, not toggling Speaking event")
 
                 # Execute the speech
                 self.speech.say(resp_message)
@@ -687,3 +699,10 @@ class BaseSpeechReceiverModule(ALModule):
             print("ERR: Error processing speech response: {}".format(e))
             if not is_chunk:
                 self.finish_speech_processing()
+
+    def _strip_brace_segments(self, text):
+        # Remove any { ... } segments (and leading whitespace before them), then collapse extra spaces
+        cleaned = re.sub(r'\s*\{[^}]*\}', '', text)
+        cleaned = re.sub(r' +', ' ', cleaned).strip()
+        return cleaned
+
