@@ -590,6 +590,13 @@ class BaseSpeechReceiverModule(ALModule):
                 print("ERR: Chat completion API error: {}".format(e))
                 self.memory.raiseEvent("Speaking", False)
 
+    def _strip_brace_segments(self, text):
+        # Remove any { ... } segments (and leading whitespace before them), then collapse extra spaces
+        cleaned = re.sub(r'\s*\{[^}]*\}', '', text)
+        cleaned = re.sub(r' +', ' ', cleaned).strip()
+        return cleaned
+
+
     def process_speech_response(self, resp_text, is_chunk=False):
         """Process speech response (extracted from original processRemote)"""
         # Sanitize the response text to extract only the JSON component
@@ -637,6 +644,14 @@ class BaseSpeechReceiverModule(ALModule):
 
                 except (SyntaxError, KeyError) as e:
                     print("DEBUG: Failed to decode message: {}".format(e))
+                    if not is_chunk:
+                        self.finish_speech_processing()
+                    return
+                
+                # Strip brace segments (e.g. { ... }) from what will be spoken
+                resp_message = self._strip_brace_segments(resp_message)
+                if not resp_message:
+                    print("DEBUG: Response empty after stripping brace segments. Cancelling speech segment.")
                     if not is_chunk:
                         self.finish_speech_processing()
                     return
