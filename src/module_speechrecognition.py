@@ -300,9 +300,6 @@ class SpeechRecognitionModule(ALModule):
         #rms = 20 * np.log10(np.sqrt(np.sum(np.power(data, 2) / len(data))))
         return rms
 
-    def version( self ):
-        return "1.1"
-
     # use this method to manually start recording (works with both autodetection enabled or disabled)
     # the recording will stop after the signal is below the threshold for IDLE_RELEASE_TIME seconds,
     # but will at least record for HOLD_TIME seconds
