@@ -34,7 +34,7 @@ class SocketClient(threading.Thread):
             print("Socket connected to {}:{}".format(self.server_addr, self.server_port))
 
         except socket.error as e:
-            print("Socket error:", e)
+            print("Socket error: {}".format(e))
             self.client_socket.close()
             self.connected = False
 
