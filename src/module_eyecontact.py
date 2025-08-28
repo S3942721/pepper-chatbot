@@ -14,8 +14,30 @@ class EyeContactModule(ALModule):
         self.face_lost_timeout = 30
 
     def __del__(self):
+        """Enhanced destructor that handles all cleanup gracefully"""
         print("INF: EyeContactModule.__del__: cleaning everything")
-        self.stop()
+        
+        try:
+            # Cancel any active timers
+            if hasattr(self, 'face_lost_timer') and self.face_lost_timer:
+                try:
+                    self.face_lost_timer.cancel()
+                    self.face_lost_timer = None
+                except:
+                    pass
+            
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribeToEvent("FaceDetected", self.getName())
+                    self.memory.unsubscribeToEvent("RunningBehaviour", self.getName())
+                except Exception as e:
+                    print("WARN: Could not unsubscribe from eye contact events: {}".format(e))
+                    
+        except Exception as e:
+            print("ERR: Error during EyeContactModule cleanup: {}".format(e))
+        finally:
+            print("INF: EyeContactModule: cleaned up!")
 
     def on_face_detected(self, event_name, value):
         if value:

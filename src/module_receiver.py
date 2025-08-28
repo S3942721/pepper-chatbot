@@ -24,6 +24,9 @@ class BaseSpeechReceiverModule(ALModule):
         ALModule.__init__(self, strModuleName )
         self.BIND_PYTHON( self.getName(),"callback" )
 
+        # Add shutdown flag
+        self.shutting_down = False
+
         self.SAY_SIGNAL = "Say"
         self.JSON_SAY_SIGNAL = "JSONSay"
 
@@ -114,8 +117,61 @@ class BaseSpeechReceiverModule(ALModule):
 
     # __init__ - end
     def __del__( self ):
+        """Enhanced destructor that handles all cleanup gracefully"""
         print( "INF: ReceiverModule.__del__: cleaning everything" )
-        self.stop()
+        
+        # Set shutdown flag to prevent new message processing
+        self.shutting_down = True
+        
+        try:
+            # Stop the queue worker first
+            if hasattr(self, 'queue_running'):
+                self.queue_running = False
+                if hasattr(self, 'queue_worker_thread') and self.queue_worker_thread and self.queue_worker_thread.is_alive():
+                    try:
+                        # Add stop signal to wake up the queue
+                        if hasattr(self, 'message_queue'):
+                            self.message_queue.put({"type": "STOP_WORKER"})
+                        self.queue_worker_thread.join(timeout=3)
+                    except:
+                        pass
+            
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribe('SpeechRecognition', self.getName())
+                    self.memory.unsubscribe('Say', self.getName())
+                    self.memory.unsubscribe('JSONSay', self.getName())
+                    self.memory.unsubscribe('SayChunk', self.getName())
+                    self.memory.unsubscribe('Speaking', self.getName())
+                    self.memory.unsubscribe('StopAction', self.getName())
+                    self.memory.unsubscribe('StopSpeech', self.getName())
+                    self.memory.unsubscribe('StopBehaviour', self.getName())
+                    self.memory.unsubscribe('StopAudio', self.getName())
+                    self.memory.unsubscribe('ALAnimatedSpeech/EndOfAnimatedSpeech', self.getName())
+                    self.memory.unsubscribe('PepperMessage', self.getName())
+                    self.memory.unsubscribe('ResetConversation', self.getName())
+                    self.memory.unsubscribe('Listening', self.getName())
+                    self.memory.unsubscribe('TriggerGapFill', self.getName())
+                except Exception as e:
+                    print("WARN: Could not unsubscribe from receiver events: {}".format(e))
+            
+            # Stop listening thread
+            if hasattr(self, 'stop_listening_thread'):
+                try:
+                    self.stop_listening_thread.set()
+                except:
+                    pass
+            if hasattr(self, 'listening_thread') and self.listening_thread and self.listening_thread.is_alive():
+                try:
+                    self.listening_thread.join(timeout=1)
+                except:
+                    pass
+                    
+        except Exception as e:
+            print("ERR: Error during ReceiverModule cleanup: {}".format(e))
+        finally:
+            print( "INF: ReceiverModule: cleaned up!" )
 
     def sync_messages(self):
         self.memory.raiseEvent("SyncMessages", json.dumps(self.messages))
@@ -438,6 +494,10 @@ class BaseSpeechReceiverModule(ALModule):
 
     def processRemote(self, signalName, message):
         """Add messages to queue instead of processing directly"""
+        # Don't process new messages during shutdown
+        if getattr(self, 'shutting_down', False):
+            return
+            
         print("DEBUG: Received from: {}".format(signalName))
         print("DEBUG: Received message: {}".format(message))
         

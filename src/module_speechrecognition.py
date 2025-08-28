@@ -119,8 +119,40 @@ class SpeechRecognitionModule(ALModule):
 
     # __init__ - end
     def __del__( self ):
+        """Enhanced destructor that handles all cleanup gracefully"""
         print( "INF: SpeechRecognitionModule.__del__: cleaning everything" )
-        self.stop()    
+        
+        try:
+            # Stop audio processing if still active
+            if hasattr(self, 'isStarted') and self.isStarted:
+                try:
+                    if hasattr(self, 'strNaoIp') and hasattr(self, 'port'):
+                        audio = ALProxy("ALAudioDevice", self.strNaoIp, self.port)
+                        audio.unsubscribe(self.getName())
+                except Exception as e:
+                    print("WARN: Could not unsubscribe from audio device: {}".format(e))
+            
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribe("EyeContact", self.getName())
+                    self.memory.unsubscribe("Speaking", self.getName())
+                    self.memory.unsubscribe("ControlRecording", self.getName())
+                    self.memory.unsubscribe("ClearSpeechRecognitionBuffer", self.getName())
+                    self.memory.unsubscribe("ResetConversation", self.getName())
+                except Exception as e:
+                    print("WARN: Could not unsubscribe from speech recognition events: {}".format(e))
+            
+            # Clean up local state
+            if hasattr(self, 'isStarted'):
+                self.isStarted = False
+            if hasattr(self, 'isRecording'):
+                self.isRecording = False
+                
+        except Exception as e:
+            print("ERR: Error during SpeechRecognitionModule cleanup: {}".format(e))
+        finally:
+            print( "INF: SpeechRecognitionModule: cleaned up!" )
 
     def start( self ):
         if(self.isStarted):

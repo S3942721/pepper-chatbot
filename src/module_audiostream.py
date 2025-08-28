@@ -638,3 +638,42 @@ class AudioStreamModule(ALModule):
             'buffer_size': len(self.audioBuffer),
             'payload_type': 'L16/{}'.format(SAMPLE_RATE)
         }
+
+    def __del__(self):
+        """Enhanced destructor that handles all cleanup gracefully"""
+        print("INF: AudioStreamModule.__del__: cleaning everything")
+        
+        try:
+            # Disable streaming if active
+            if hasattr(self, 'isStreamingEnabled') and self.isStreamingEnabled:
+                try:
+                    self.disable_stream()
+                except:
+                    pass
+            
+            # Stop GStreamer pipeline if exists
+            if hasattr(self, 'pipeline') and self.pipeline and hasattr(self, 'gstreamer_available') and self.gstreamer_available:
+                try:
+                    self.pipeline.set_state(self.gst.STATE_NULL)
+                    self.pipeline = None
+                except:
+                    pass
+            
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribe("ControlAudioStreaming", self.getName())
+                    self.memory.unsubscribe("Speaking", self.getName())
+                    # Also unsubscribe from any temporary event subscriptions
+                    try:
+                        self.memory.unsubscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName())
+                    except:
+                        pass
+                except Exception as e:
+                    print("WARN: Could not unsubscribe from audio stream events: {}".format(e))
+                    
+        except Exception as e:
+            print("ERR: Error during AudioStreamModule cleanup: {}".format(e))
+        finally:
+            print("INF: AudioStreamModule: cleaned up!")
+

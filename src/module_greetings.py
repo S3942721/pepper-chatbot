@@ -142,9 +142,26 @@ class GreetingsModule(ALModule):
             print("ERR: GreetingsModule: Invalid greetings key: {}".format(value))
 
     def stop(self):
-        self.memory.unsubscribeToEvent("FaceDetected", self.getName())
-        self.memory.unsubscribeToEvent("ControlGreetings", self.getName())
-        self.memory.unsubscribeToEvent("GreetingsRequireFaceLost", self.getName())
-        if self.face_lost_timer:
-            self.face_lost_timer.cancel()
-        print("INF: GreetingsModule: stopped!")
+        """Stop the greetings module and clean up resources"""
+        try:
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribeToEvent("FaceDetected", self.getName())
+                    self.memory.unsubscribeToEvent("ControlGreetings", self.getName())
+                    self.memory.unsubscribeToEvent("GreetingsRequireFaceLost", self.getName())
+                    self.memory.unsubscribeToEvent("LoadHTML", self.getName())
+                    self.memory.unsubscribeToEvent("ChangeGreetTimeout", self.getName())
+                    self.memory.unsubscribeToEvent("ChangeGreetFaceLostTimeout", self.getName())
+                    self.memory.unsubscribeToEvent("ChangeGreetingKey", self.getName())
+                except Exception as e:
+                    # Memory may already be destroyed during broker shutdown
+                    print("WARN: Could not unsubscribe from events: {}".format(e))
+            
+            if self.face_lost_timer:
+                self.face_lost_timer.cancel()
+                self.face_lost_timer = None
+                
+        except Exception as e:
+            print("ERR: Error during GreetingsModule stop: {}".format(e))
+        finally:
+            print("INF: GreetingsModule: stopped!")

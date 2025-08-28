@@ -230,3 +230,33 @@ class BehaviourExecutor(ALModule):
         mode = "MoveContextually" if value else "WholeBody"
         print("Control tracking mode: {}".format(mode))
         aba.setTrackingMode(mode)
+
+    def stop(self):
+        """Stop the expressions module and clean up"""
+        try:
+            # Unsubscribe from events
+            try:
+                if hasattr(self, 'memory'):
+                    self.memory.unsubscribe("Sound", self.getName())
+                    self.memory.unsubscribe("EyeColour", self.getName())
+                    self.memory.unsubscribe("EyeColourHold", self.getName())
+                    self.memory.unsubscribe("Mute", self.getName())
+                    self.memory.unsubscribe("Volume", self.getName())
+                    self.memory.unsubscribe("ChangeResponseSpeed", self.getName())
+                    self.memory.unsubscribe("ChangeSentencePause", self.getName())
+                    self.memory.unsubscribe("ControlContextMovement", self.getName())
+                    self.memory.unsubscribe("ControlEngagement", self.getName())
+                    self.memory.unsubscribe("ControlAwareness", self.getName())
+            except Exception as e:
+                print("WARN: Could not unsubscribe from expression events: {}".format(e))
+                
+        except Exception as e:
+            print("ERR: Error during BehaviourExecutor stop: {}".format(e))
+        finally:
+            print("INF: BehaviourExecutor: stopped!")
+
+    def __del__(self):
+        """Enhanced destructor that handles all cleanup gracefully"""
+        print("INF: BehaviourExecutor.__del__: cleaning everything")
+
+        self.stop()

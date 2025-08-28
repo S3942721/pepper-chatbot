@@ -32,8 +32,46 @@ class ExploringModule(ALModule):
         print("INF: ExploringModule: initialized with name: {}".format(name))
 
     def __del__(self):
+        """Enhanced destructor that handles all cleanup gracefully"""
         print("INF: ExploringModule.__del__: cleaning everything")
-        self.stop_exploring()
+        
+        try:
+            # Stop exploration if active
+            if hasattr(self, 'exploring') and self.exploring:
+                try:
+                    if hasattr(self, 'navigation_service'):
+                        self.navigation_service.stopExploration()
+                    if hasattr(self, 'motion_service'):
+                        self.motion_service.move(0.0, 0.0, 0.0)
+                except:
+                    pass
+            
+            # Cancel any active timers
+            if hasattr(self, 'non_interactive_timer') and self.non_interactive_timer:
+                try:
+                    self.non_interactive_timer.cancel()
+                    self.non_interactive_timer = None
+                except:
+                    pass
+            
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribe("Speaking", self.getName())
+                    self.memory.unsubscribe("ControlWandering", self.getName())
+                    self.memory.unsubscribe("ControlExploration", self.getName())
+                    self.memory.unsubscribe("StopAction", self.getName())
+                except Exception as e:
+                    print("WARN: Could not unsubscribe from exploration events: {}".format(e))
+            
+            # Clean up state
+            if hasattr(self, 'exploring'):
+                self.exploring = False
+                
+        except Exception as e:
+            print("ERR: Error during ExploringModule cleanup: {}".format(e))
+        finally:
+            print("INF: ExploringModule: cleaned up!")
 
     def on_control_wandering(self, event_name, value):
         print("INF: ExploringModule: on_control_wandering called with value: {}".format(value))

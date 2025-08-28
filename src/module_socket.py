@@ -33,6 +33,15 @@ class SocketClient(threading.Thread):
             self.connected = True
             print("Socket connected to {}:{}".format(self.server_addr, self.server_port))
 
+            # Send robot identification
+            identification_message = json.dumps({
+                "cmd": "robot-identify",
+                "robot": "Haku",
+                "timestamp": time.time()
+            })
+            self.client_socket.send(identification_message.encode())
+            print("Sent robot identification: {}".format(identification_message))
+
         except socket.error as e:
             print("Socket error: {}".format(e))
             self.client_socket.close()

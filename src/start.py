@@ -353,11 +353,47 @@ def main():
 
     except KeyboardInterrupt:
         print()
-        print("Interrupted by user, shutting down")
-        memory.raiseEvent("StopAction", None)
-        time.sleep(1)
+        print("Interrupted by user, shutting down gracefully...")
+        
+        # Stop socket client first
+        try:
+            print("Stopping socket client...")
+            socket_client.running = False
+            socket_client.join(timeout=2)
+        except:
+            pass
+        
+        # Clean up modules by removing references and letting __del__ handle cleanup
+        try:
+            print("Cleaning up modules...")
+            # Remove global references to trigger __del__ methods
+            if 'AudioStream' in globals():
+                del AudioStream
+            if 'SpeechRecognition' in globals():
+                del SpeechRecognition
+            if 'Receiver' in globals():
+                del Receiver
+            if 'Greetings' in globals():
+                del Greetings
+            if 'Expressions' in globals():
+                del Expressions
+            if 'EyeContact' in globals():
+                del EyeContact
+            if 'Motion' in globals():
+                del Motion
+            if 'Exploration' in globals():
+                del Exploration
+            if 'HealthyCheck' in globals():
+                del HealthyCheck
+        except Exception as e:
+            print("Error during module cleanup: {}".format(e))
+        
+        # Give modules time to clean up
+        print("Waiting for modules to clean up...")
+        time.sleep(2)
+        
+        print("Shutting down broker...")
         myBroker.shutdown()
-        socket_client.join()
         sys.exit(0)
 
 if __name__ == "__main__":
