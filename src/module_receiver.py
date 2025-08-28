@@ -62,7 +62,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("StopAction", self.getName(), "stop_all")
         self.memory.subscribeToEvent("StopBehaviour", self.getName(), "stop_behaviour")
         self.memory.subscribeToEvent("StopAudio", self.getName(), "stop_audio")
-        self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "clear_display")
+        self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "finished_speaking")
         self.memory.subscribeToEvent("PepperMessage", self.getName(), "pepper_message")
 
         self.messages = []
@@ -123,13 +123,31 @@ class BaseSpeechReceiverModule(ALModule):
     def pepper_message(self, _, value):
         print("DEBUG: Pepper message event received with value {}".format(value))     
 
-    def clear_display(self, _, value):
+    def finished_speaking(self, _, value):
         print("DEBUG: Clear display event received")
         self.memory.raiseEvent("PepperMessage", None)
         
         # Signal that speech has finished
         self.is_currently_speaking = False
         self.speech_finished_event.set()
+
+        # Only mark global Speaking as False if there are no pending queued messages.
+        # If there are queued messages we want to keep Speaking=True so audio streaming
+        # remains paused between consecutive speech items.
+        try:
+            with self.queue_lock:
+                queue_empty = self.message_queue.empty()
+        except Exception:
+            # If queue isn't available for any reason, fall back to clearing speaking
+            queue_empty = True
+
+        if queue_empty:
+            # Ensure other modules know speaking ended (so audio streaming resumes consistently)
+            self.memory.raiseEvent("Speaking", False)
+            print("DEBUG: Speaking False raised (no queued messages)")
+        else:
+            # Keep Speaking True while queued items remain; worker will handle next item.
+            print("DEBUG: Speaking remains True ({} queued)".format(self.message_queue.qsize()))
 
     def stop_speech(self, _, value):
         print("DEBUG: Stop speech event received")
@@ -159,20 +177,19 @@ class BaseSpeechReceiverModule(ALModule):
         audio_player.stopAll()
 
     def stop_all(self, _, value):
-        print("DEBUG: Stop all event received - processing any pending messages first")
-        
-        # Process any pending messages before clearing
-        if hasattr(self, 'message_queue') and not self.message_queue.empty():
-            print("DEBUG: Processing {} pending messages before stop all".format(self.message_queue.qsize()))
-            # Give the queue worker a moment to process pending messages
-            time.sleep(0.1)
-        
-        # Now clear the queue and stop speech
-        self.clear_message_queue()
+        """Stop current speech/behaviours but do NOT clear pending queued messages.
+
+        StopAction is often raised before the Say event (socket shortcuts). If we clear
+        the queue here we risk discarding the very Say we are about to enqueue.
+        Keep behaviour stopping but preserve the queue so incoming Say/SayChunk will run.
+        """
+        print("DEBUG: Stop all event received - stopping speech and behaviours (queue preserved)")
+
+        # Stop current speech only (allow pending queued messages to be processed)
         self.stop_current_speech()
-        
-        # Original stop all functionality
-        self.clear_display(_, value)
+
+        # Original stop all functionality (stop display/behaviours/audio)
+        self.finished_speaking(_, value)
         self.stop_speech(_, value)
         self.stop_behaviour(_, value)
         self.stop_audio(_, value)
@@ -205,7 +222,6 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("JSONSay", self.getName(), "processRemote")
         self.memory.subscribeToEvent("SayChunk", self.getName(), "processRemote")
         print( "INF: ReceiverModule: started!" )
-
 
     def stop( self ):
         """Enhanced stop to shutdown queue worker"""
@@ -374,17 +390,34 @@ class BaseSpeechReceiverModule(ALModule):
             print("ERR: Error processing speech chunk: {}".format(e))
 
     def stop_current_speech(self):
-        """Stop current speech and wait for it to finish"""
+        """Stop current speech without triggering global StopAction (preserve queue)."""
         try:
             if self.is_currently_speaking:
-                # Stop all speech and behaviors
-                self.memory.raiseEvent("StopAction", None)
-                
-                # Wait for speech to actually stop (with timeout)
+                # Stop animated speech / tts directly, avoid raising StopAction which clears queues elsewhere
+                try:
+                    tts = ALProxy("ALTextToSpeech")
+                    tts.stopAll()
+                except Exception:
+                    pass
+                try:
+                    # ALAnimatedSpeech may also be speaking
+                    self.speech.stopAll()
+                except Exception:
+                    pass
+
+                # Signal running behaviour stopped
+                try:
+                    self.memory.raiseEvent("RunningBehaviour", False)
+                except Exception:
+                    pass
+
+                # Wait for ALAnimatedSpeech end event to set the finished event (with timeout)
                 self.speech_finished_event.wait(timeout=2)
                 self.speech_finished_event.clear()
-                
-                print("DEBUG: Current speech stopped")
+
+                # Update state
+                self.is_currently_speaking = False
+                print("DEBUG: Current speech stopped (direct stop)")
         except Exception as e:
             print("ERR: Error stopping current speech: {}".format(e))
 
@@ -499,18 +532,18 @@ class BaseSpeechReceiverModule(ALModule):
 
     def process_speech_response(self, resp_text, is_chunk=False):
         """Process speech response (extracted from original processRemote)"""
-        try:
-            # Sanitize the response text to extract only the JSON component
-            json_start = resp_text.find('{')
-            json_end = resp_text.rfind('}') + 1
-            if json_start != -1 and json_end != -1:
-                resp_text = resp_text[json_start:json_end]
-            else:
-                print("DEBUG: No valid JSON found in response text.")
-                if not is_chunk:
-                    self.finish_speech_processing()
-                return
+        # Sanitize the response text to extract only the JSON component
+        json_start = resp_text.find('{')
+        json_end = resp_text.rfind('}') + 1
+        if json_start != -1 and json_end != -1:
+            resp_text = resp_text[json_start:json_end]
+        else:
+            print("DEBUG: No valid JSON found in response text.")
+            if not is_chunk:
+                self.finish_speech_processing()
+            return
 
+        try:
             # Sanitize the response to text replace any non ascii characters with ascii equivalents
             resp_text = resp_text.encode('ascii', 'ignore').decode('ascii')
 
@@ -552,6 +585,15 @@ class BaseSpeechReceiverModule(ALModule):
                 print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
                 self.memory.raiseEvent("RunningBehaviour", True)
                 
+                # Mark speaking state and notify other modules (e.g. audio stream) BEFORE speaking
+                if not self.is_currently_speaking:
+                    self.is_currently_speaking = True
+                    try:
+                        self.memory.raiseEvent("Speaking", True)
+                    except Exception:
+                        pass
+                    print("DEBUG: Speaking True set for speech response")
+
                 # Execute the speech
                 self.speech.say(resp_message)
                 
@@ -570,9 +612,3 @@ class BaseSpeechReceiverModule(ALModule):
             print("ERR: Error processing speech response: {}".format(e))
             if not is_chunk:
                 self.finish_speech_processing()
-
-    def finish_speech_processing(self):
-        """Finish speech processing and reset state"""
-        self.is_currently_speaking = False
-        self.current_speech_id = None
-        # Note: Speaking False is handled by ALAnimatedSpeech/EndOfAnimatedSpeech event
