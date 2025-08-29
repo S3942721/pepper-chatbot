@@ -1,5 +1,6 @@
 import threading
 from naoqi import ALProxy, ALModule
+import logger
 
 class EyeContactModule(ALModule):
     def __init__(self, name):
@@ -15,7 +16,7 @@ class EyeContactModule(ALModule):
 
     def __del__(self):
         """Enhanced destructor that handles all cleanup gracefully"""
-        print("INF: EyeContactModule.__del__: cleaning everything")
+        logger.info("cleaning everything")
         
         try:
             # Cancel any active timers
@@ -32,37 +33,37 @@ class EyeContactModule(ALModule):
                     self.memory.unsubscribeToEvent("FaceDetected", self.getName())
                     self.memory.unsubscribeToEvent("RunningBehaviour", self.getName())
                 except Exception as e:
-                    print("WARN: Could not unsubscribe from eye contact events: {}".format(e))
+                    logger.warning("Could not unsubscribe from eye contact events:", e)
                     
         except Exception as e:
-            print("ERR: Error during EyeContactModule cleanup: {}".format(e))
+            logger.error("Error during EyeContactModule cleanup:", e)
         finally:
-            print("INF: EyeContactModule: cleaned up!")
+            logger.info("cleaned up!")
 
     def on_face_detected(self, event_name, value):
         if value:
             if not self.face_detected:
-                # print("Face detected")
+                # logger.info("Face detected")
                 self.handle_status_change(True)
             if self.face_lost_timer:
                 self.face_lost_timer.cancel()
                 self.face_lost_timer = None
         else:
             if self.face_detected:
-                # print("Face lost")
+                # logger.info("Face lost")
                 self.face_lost_timer = threading.Timer(self.face_lost_timeout, self.handle_status_change, [False])
                 self.face_lost_timer.start()
 
     def handle_status_change(self, status):
         self.face_detected = status
-        # print("INF: EyeContactModule: Eye contact is", "ON" if status else "OFF")
+        # logger.info("Eye contact is %s", "ON" if status else "OFF")
         self.memory.raiseEvent('EyeContact', status)
         if not self.face_detected:
-            # print("INF: EyeContactModule: Resetting conversation")
+            # logger.info("Resetting conversation")
             self.memory.raiseEvent('ResetConversation', True)
 
     def stop(self):
         self.memory.unsubscribeToEvent("FaceDetected", self.getName())
         if self.face_lost_timer:
             self.face_lost_timer.cancel()
-        print("INF: EyeContactModule: stopped!")
+        logger.info("stopped!")

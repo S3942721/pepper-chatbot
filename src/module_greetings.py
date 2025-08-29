@@ -4,6 +4,7 @@ import random
 import json
 from naoqi import ALProxy, ALModule
 import os
+import logger
 
 class GreetingsModule(ALModule):
     def __init__(self, name):
@@ -32,13 +33,13 @@ class GreetingsModule(ALModule):
         self.waiting_for_greeting = False
         self.ANNOUNCEMENTS_PATH = os.path.join(os.path.dirname(__file__), 'announcements.json')
 
-        print("INF: GreetingsModule: Loading greetings from {}".format(self.ANNOUNCEMENTS_PATH))
+        logger.info("Loading greetings from", self.ANNOUNCEMENTS_PATH)
         # Load the greetings from the json
         self.greetings_dictionary = {}
         with open(self.ANNOUNCEMENTS_PATH, 'r') as file:
             self.greetings_dictionary = json.load(file)
-        print("INF: GreetingsModule: Loaded greetings from {}".format(self.ANNOUNCEMENTS_PATH))
-        print("Loaded greetings: {}".format(self.greetings_dictionary))
+        logger.info("Loaded greetings from", self.ANNOUNCEMENTS_PATH)
+        logger.verbose("Loaded greetings:", self.greetings_dictionary)
         
         self.CN_GREETINGS = "City North Greetings"
         self.LTQ_GREETINGS = "LTQ Greetings"
@@ -47,50 +48,75 @@ class GreetingsModule(ALModule):
         self.greetings = self.DEFAULT_GREETINGS
 
     def __del__(self):
-        print("INF: GreetingsModule.__del__: cleaning everything")
-        self.stop()
+        """Enhanced destructor that handles all cleanup gracefully"""
+        logger.info("cleaning everything")
+        
+        try:
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribeToEvent("FaceDetected", self.getName())
+                    self.memory.unsubscribeToEvent("ControlGreetings", self.getName())
+                    self.memory.unsubscribeToEvent("GreetingsRequireFaceLost", self.getName())
+                    self.memory.unsubscribeToEvent("LoadHTML", self.getName())
+                    self.memory.unsubscribeToEvent("ChangeGreetTimeout", self.getName())
+                    self.memory.unsubscribeToEvent("ChangeGreetFaceLostTimeout", self.getName())
+                    self.memory.unsubscribeToEvent("ChangeGreetingKey", self.getName())
+                except Exception as e:
+                    # Memory may already be destroyed during broker shutdown
+                    logger.warning("Could not unsubscribe from greetings events:", e)
+            
+            # Cancel any active timers
+            if hasattr(self, 'face_lost_timer') and self.face_lost_timer:
+                self.face_lost_timer.cancel()
+                self.face_lost_timer = None
+                
+        except Exception as e:
+            logger.error("Error during GreetingsModule cleanup:", e)
+        finally:
+            logger.info("cleaned up!")
         
     def update_profile(self, event_name, value):
         if "ltq" in value.lower():
             self.greetings = self.LTQ_GREETINGS
-            print("INF: GreetingsModule: Updated greetings for LTQ profile")
+            logger.info("Updated greetings for LTQ profile")
         elif "north" in value.lower() or "city" in value.lower():
             self.greetings = self.CN_GREETINGS
-            print("INF: GreetingsModule: Updated greetings for CityNorth profile")
+            logger.info("Updated greetings for CityNorth profile")
         else:
             self.greetings = self.DEFAULT_GREETINGS
-            print("INF: GreetingsModule: Updated greetings for default profile", value)
+            logger.info("Updated greetings for default profile:", value)
     
     def on_control_greetings(self, event_name = None, value = False):
         self.enabled_greetings = value
-        print("Received control greetings event")
-        print("INF: GreetingsModule: Greetings are", "ON" if value else "OFF")
+        logger.info("Received control greetings event")
+        logger.info("Greetings are", "ON" if value else "OFF")
 
     def on_greetings_require_face_lost(self, event_name, value):
         self.require_face_lost = value
-        print("INF: GreetingsModule: Greetings require face lost is", "ON" if value else "OFF")
+        logger.info("Greetings require face lost is", "ON" if value else "OFF")
 
     def on_speak_timeout_change(self, event_name, value):
         self.speak_timeout = value
-        print("INF: GreetingsModule: Speak timeout changed to", value)
+        logger.info("Speak timeout changed to", value)
 
     def on_face_lost_timeout_change(self, event_name, value):
         self.face_lost_timeout = value
-        print("INF: GreetingsModule: Face lost timeout changed to", value)
+        logger.info("Face lost timeout changed to", value)
 
     def on_face_detected(self, event_name, value):
         if not self.enabled_greetings:
             return
         if value:
             if not self.face_detected:
-                print("Face detected")
+                logger.info("Face detected")
                 self.handle_status_change(True)
                 self.say_greeting()
             if self.face_lost_timer:
                 self.face_lost_timer.cancel()
                 self.face_lost_timer = None
         else:
-            print("Face lost")
+            logger.info("Face lost")
             if self.face_detected and not self.waiting_for_greeting and self.require_face_lost:
                 self.face_lost_timer = threading.Timer(self.face_lost_timeout, self.handle_status_change, [False])
                 self.face_lost_timer.start()
@@ -103,19 +129,19 @@ class GreetingsModule(ALModule):
             self.face_detected = False
         if not status and not self.waiting_for_greeting:
             self.has_been_greeted = False
-            print("INF: GreetingsModule: Resetting conversation")
+            logger.info("Resetting conversation")
 
     def say_greeting(self):
         if not self.enabled_greetings:
             return
-        print("INF: GreetingsModule: Saying greeting")
+        logger.info("Saying greeting")
         current_time = time.time()
         if current_time - self.last_spoken_time > self.speak_timeout and not (self.require_face_lost and self.has_been_greeted) and not self.waiting_for_greeting:
             self.has_been_greeted = True
             if self.greetings in self.greetings_dictionary:
                 greeting = random.choice(self.greetings_dictionary[self.greetings])
             else:
-                print("ERR: GreetingsModule: Invalid greetings key:", self.greetings)
+                logger.error("Invalid greetings key:", self.greetings)
                 greeting = random.choice(self.greetings_dictionary[self.DEFAULT_GREETINGS])
 
             self.memory.raiseEvent('Say', str(greeting))
@@ -128,7 +154,7 @@ class GreetingsModule(ALModule):
         self.memory.unsubscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName())
         self.waiting_for_greeting = False
         if self.require_face_lost:
-            print("INF: GreetingsModule: Greeting finished")
+            logger.info("Greeting finished")
             self.has_been_greeted = True
             self.on_face_detected(None, True)
             self.on_face_detected(None, False) # Start face lost timer in case face is not detected immediately after greeting as face lost is only triggered once on face lost
@@ -137,9 +163,9 @@ class GreetingsModule(ALModule):
         # Change the greetings keyword in the json file
         if value in self.greetings_dictionary:
             self.greetings = value
-            print("INF: GreetingsModule: Changed greetings to {}".format(value))
+            logger.info("Changed greetings to", value)
         else:
-            print("ERR: GreetingsModule: Invalid greetings key: {}".format(value))
+            logger.error("Invalid greetings key:", value)
 
     def stop(self):
         """Stop the greetings module and clean up resources"""
@@ -155,13 +181,13 @@ class GreetingsModule(ALModule):
                     self.memory.unsubscribeToEvent("ChangeGreetingKey", self.getName())
                 except Exception as e:
                     # Memory may already be destroyed during broker shutdown
-                    print("WARN: Could not unsubscribe from events: {}".format(e))
+                    logger.warning("Could not unsubscribe from events:", e)
             
             if self.face_lost_timer:
                 self.face_lost_timer.cancel()
                 self.face_lost_timer = None
                 
         except Exception as e:
-            print("ERR: Error during GreetingsModule stop: {}".format(e))
+            logger.error("Error during GreetingsModule stop:", e)
         finally:
-            print("INF: GreetingsModule: stopped!")
+            logger.info("stopped!")

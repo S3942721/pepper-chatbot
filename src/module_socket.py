@@ -5,6 +5,7 @@ from naoqi import ALProxy
 import time
 import struct
 import numpy as np
+import logger
 
 class SocketClient(threading.Thread):
     def __init__(self, server_addr, server_port):
@@ -24,14 +25,14 @@ class SocketClient(threading.Thread):
     def set_speech_module(self, speech_module):
         """Keep method for compatibility but audio streaming now uses dedicated UDP module"""
         self.speech_module = speech_module
-        print("Speech module reference set in socket client")
+        logger.info("Speech module reference set in socket client")
 
     def connection(self):
         try:
             self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.client_socket.connect((self.server_addr, self.server_port))
             self.connected = True
-            print("Socket connected to {}:{}".format(self.server_addr, self.server_port))
+            logger.info("Socket connected to", self.server_addr, self.server_port)
 
             # Send robot identification
             identification_message = json.dumps({
@@ -40,10 +41,10 @@ class SocketClient(threading.Thread):
                 "timestamp": time.time()
             })
             self.client_socket.send(identification_message.encode())
-            print("Sent robot identification: {}".format(identification_message))
+            logger.info("Sent robot identification:", identification_message)
 
         except socket.error as e:
-            print("Socket error: {}".format(e))
+            logger.error("Socket error:", e)
             self.client_socket.close()
             self.connected = False
 
@@ -54,7 +55,7 @@ class SocketClient(threading.Thread):
             if not self.connected:
                 self.connection()
                 if not self.connected:
-                    print("Connection refused, waiting to retry...")
+                    logger.warning("Connection refused, waiting to retry...")
                     time.sleep(5)  # Wait before retrying
                     continue
             try:
@@ -73,14 +74,14 @@ class SocketClient(threading.Thread):
                     except ValueError:
                         break
             except socket.error as e:
-                print("Socket error:", e)
+                logger.error("Socket error:", e)
                 self.connected = False
                 self.client_socket.close()
         if self.running:
             self.run()
 
     def process_message(self, json_data):
-        print("Received message: {}".format(json_data))
+        logger.info("Received message:", json_data)
         try:
             if json_data['type'] == 'script':
                 msg = str(json_data['message'])
@@ -127,16 +128,16 @@ class SocketClient(threading.Thread):
                         cont_move_data = [x, y, hx, hy]
                         self.memory.raiseEvent('ContinuousMove', cont_move_data)
                     except (ValueError, TypeError) as e:
-                        print("Error converting ConMove values to float: {}".format(e))
+                        logger.error("Error converting ConMove values to float:", e)
             elif json_data['type'] == 'announcement':
                 if json_data['message']:
                     self.memory.raiseEvent('ChangeGreetingKey', str(json_data['message']))
         except Exception as e:
-            print("ERROR: Processing message error {}".format(e))
+            logger.error("Processing message error", e)
 
     def join(self, timeout=None):
         self.running = False
         self.client_socket.sendall('SHUTDOWN'.encode('utf-8'))
         self.client_socket.close()
-        print("Connection closed")
+        logger.info("Connection closed")
         super(SocketClient, self).join(timeout)

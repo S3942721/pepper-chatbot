@@ -1,6 +1,7 @@
 from naoqi import ALProxy, ALModule
 import time
 import json
+import logger
 
 
 class HealthyCheckModule(ALModule):
@@ -29,11 +30,11 @@ class HealthyCheckModule(ALModule):
         self.memory.raiseEvent("HealthyCheck", "ping")
         self.got_pong = False
         self.got_pong = self.tablet_service.preLoadImage(self.webview_url)
-        # print("Getting pong")
+        # logger.info("Getting pong")
         time.sleep(10)
-        # print("Got pong: {}".format(self.got_pong))
+        # logger.info("Got pong:", self.got_pong)
         if not self.got_pong:
-            print("No pong from tablet, reloading webview")
+            logger.warning("No pong from tablet, reloading webview")
             self.tablet_service.preLoadImage(self.webview_url)
             self.tablet_service.showWebview(self.webview_url)
             time.sleep(2)
@@ -61,7 +62,7 @@ class HealthyCheckModule(ALModule):
         self.chat_history = value
 
     def update_html_url(self, event_name, value):
-        print("Loading HTML: {}".format(value))
+        logger.info("Loading HTML:", value)
         self.webview_url = value
         self.tablet_service.showWebview(self.webview_url)
         self.tablet_service.reloadPage(0)

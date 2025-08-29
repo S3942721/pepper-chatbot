@@ -6,6 +6,7 @@ import socket
 import numpy as np
 from naoqi import ALModule, ALProxy
 import traceback
+import logger
 
 # Don't import GStreamer at module level - it intercepts command line arguments
 # We'll import it only when needed in the methods
@@ -51,7 +52,7 @@ class AudioStreamModule(ALModule):
             self.packets_sent = 0
             self.network_errors = 0
             
-            print("AUDIO: AudioStreamModule initialized - target: {}:{}".format(target_host, target_port))
+            logger.info("AudioStreamModule initialized - target:", target_host, target_port)
             
             # Memory setup
             self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
@@ -59,7 +60,7 @@ class AudioStreamModule(ALModule):
             self.memory.subscribeToEvent("Speaking", self.getName(), "on_speaking_event")
             
         except BaseException as err:
-            print("ERR: AudioStreamModule: loading error: %s" % str(err))
+            logger.error("AudioStreamModule: loading error:", err)
 
     def check_gstreamer_availability(self):
         """Check if GStreamer is available - only when needed"""
@@ -79,18 +80,18 @@ class AudioStreamModule(ALModule):
             self.gobject = gobject
             self.gstreamer_available = True
             
-            print("AUDIO: GStreamer available")
+            logger.info("GStreamer available")
             return True
             
         except ImportError as e:
-            print("WARN: GStreamer not available: %s" % e)
+            logger.warning("GStreamer not available:", e)
             self.gstreamer_available = False
             return False
 
     def create_gstreamer_pipeline(self):
         """Create GStreamer pipeline for audio streaming"""
         if not self.check_gstreamer_availability():
-            print("ERR: Cannot create pipeline - GStreamer not available")
+            logger.error("Cannot create pipeline - GStreamer not available")
             return False
             
         try:
@@ -113,7 +114,7 @@ class AudioStreamModule(ALModule):
                 "async=false"
             ) % (self.target_host, self.target_port)
             
-            print("AUDIO: Creating GStreamer pipeline: %s" % pipeline_desc)
+            logger.info("Creating GStreamer pipeline:", pipeline_desc)
             
             self.pipeline = self.gst.parse_launch(pipeline_desc)
             
@@ -125,8 +126,8 @@ class AudioStreamModule(ALModule):
             return True
             
         except Exception as e:
-            print("ERR: Failed to create GStreamer pipeline: %s" % e)
-            print("ERR: Trying simple fallback pipeline...")
+            logger.error("Failed to create GStreamer pipeline:", e)
+            logger.error("Trying simple fallback pipeline...")
             
             # Fallback: even simpler pipeline if the main one fails
             try:
@@ -137,7 +138,7 @@ class AudioStreamModule(ALModule):
                     "udpsink host=%s port=%d"
                 ) % (self.target_host, self.target_port)
                 
-                print("AUDIO: Trying fallback pipeline: %s" % fallback_pipeline_desc)
+                logger.info("Trying fallback pipeline:", fallback_pipeline_desc)
                 
                 self.pipeline = self.gst.parse_launch(fallback_pipeline_desc)
                 
@@ -149,30 +150,29 @@ class AudioStreamModule(ALModule):
                 return True
                 
             except Exception as e2:
-                print("ERR: All pipeline attempts failed: %s" % e2)
+                logger.error("All pipeline attempts failed:", e2)
                 return False
 
     def on_gstreamer_message(self, bus, message):
         """Handle GStreamer pipeline messages"""
         if message.type == self.gst.MESSAGE_ERROR:
             err, debug = message.parse_error()
-            print("AUDIO: GStreamer error: %s" % err)
-            print("AUDIO: Debug: %s" % debug)
+            logger.error("GStreamer error:", err)
+            logger.error("Debug:", debug)
             self.network_errors += 1
             self.stop_gstreamer_pipeline()
         elif message.type == self.gst.MESSAGE_EOS:
-            print("AUDIO: End of stream")
+            logger.info("End of stream")
             self.stop_gstreamer_pipeline()
         elif message.type == self.gst.MESSAGE_STATE_CHANGED:
             old_state, new_state, pending_state = message.parse_state_changed()
             if message.src == self.pipeline:
-                print("AUDIO: Pipeline state changed from %s to %s" % 
-                      (old_state.value_name, new_state.value_name))
+                logger.info("Pipeline state changed from", old_state.value_name, "to", new_state.value_name)
 
     def start_gstreamer_pipeline(self):
         """Start the GStreamer audio pipeline"""
         if not self.check_gstreamer_availability():
-            print("ERR: Cannot start pipeline - GStreamer not available")
+            logger.error("Cannot start pipeline - GStreamer not available")
             return False
             
         if not self.pipeline:
@@ -180,12 +180,12 @@ class AudioStreamModule(ALModule):
                 return False
         
         try:
-            print("AUDIO: Starting GStreamer pipeline to %s:%d" % (self.target_host, self.target_port))
+            logger.info("Starting GStreamer pipeline to", self.target_host, self.target_port)
             self.pipeline.set_state(self.gst.STATE_PLAYING)
             self.stream_start_time = time.time()
             return True
         except Exception as e:
-            print("ERR: Failed to start GStreamer pipeline: %s" % e)
+            logger.error("Failed to start GStreamer pipeline:", e)
             return False
 
     def stop_gstreamer_pipeline(self):
@@ -197,16 +197,16 @@ class AudioStreamModule(ALModule):
                 # Print session statistics
                 if self.stream_start_time > 0:
                     duration = time.time() - self.stream_start_time
-                    print("AUDIO: Streaming session ended:")
-                    print("  - Duration: {:.2f} seconds".format(duration))
-                    print("  - Target: {}:{}".format(self.target_host, self.target_port))
-                    print("  - Network errors: {}".format(self.network_errors))
+                    logger.info("Streaming session ended:")
+                    logger.info("  - Duration:", duration, "seconds")
+                    logger.info("  - Target:", self.target_host, ":", self.target_port)
+                    logger.info("  - Network errors:", self.network_errors)
                 
                 self.pipeline = None
                 self.stream_start_time = 0
                 
             except Exception as e:
-                print("ERR: Failed to stop GStreamer pipeline: %s" % e)
+                logger.error("Failed to stop GStreamer pipeline:", e)
 
     def test_network_connection(self):
         """Test if target device is reachable"""
@@ -221,7 +221,7 @@ class AudioStreamModule(ALModule):
 
     def control_streaming(self, _, value):
         """Control audio streaming based on boolean value"""
-        print("CONTROL: Audio streaming control signal received - value: {}".format(value))
+        logger.info("CONTROL: Audio streaming control signal received - value:", value)
         if value:
             self.enable_stream()
         else:
@@ -231,8 +231,7 @@ class AudioStreamModule(ALModule):
         """Handle speaking state changes to pause/resume audio streaming"""
         is_speaking = bool(is_speaking)
         
-        print("AUDIO: Speaking event received - value: {}, current state: {}".format(
-            is_speaking, self.isSpeaking))
+        logger.info("Speaking event received - value:", is_speaking, "current state:", self.isSpeaking)
         
         # Only process if state actually changed
         if self.isSpeaking != is_speaking:
@@ -244,18 +243,20 @@ class AudioStreamModule(ALModule):
                 self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "stopped_speaking")
                 self.led_service.fadeRGB("FaceLeds", 0xFF0000, 0.1)
                 
-                print("AUDIO: Speaking detected - pausing audio stream")
+                logger.info("Speaking detected - pausing audio stream")
                 # Temporarily pause the pipeline without stopping it completely
                 if self.pipeline and self.gstreamer_available and self.isStreamingEnabled:
                     try:
                         # Pause the pipeline instead of stopping it
                         self.pipeline.set_state(self.gst.STATE_PAUSED)
-                        print("AUDIO: Pipeline paused successfully")
+                        logger.info("Pipeline paused successfully")
                     except Exception as e:
-                        print("ERR: Failed to pause GStreamer pipeline: %s" % e)
+                        logger.error("Failed to pause GStreamer pipeline:", e)
             else:
-                print("AUDIO: Speaking ended via direct event - resuming audio stream")
+                logger.info("Speaking ended - resuming audio stream")
                 self.resume_audio_stream()
+        else:
+            logger.info("Speaking state unchanged, no action needed")
     
     def resume_audio_stream(self):
         """Resume audio streaming after speaking ends"""
@@ -272,37 +273,56 @@ class AudioStreamModule(ALModule):
                 try:
                     # Resume the pipeline
                     self.pipeline.set_state(self.gst.STATE_PLAYING)
-                    print("AUDIO: Pipeline resumed successfully")
+                    logger.info("Pipeline resumed successfully")
                 except Exception as e:
-                    print("ERR: Failed to resume GStreamer pipeline: %s" % e)
+                    logger.error("Failed to resume GStreamer pipeline:", e)
         except Exception as e:
-            print("ERR: Error in resume_audio_stream: %s" % e)
+            logger.error("Error in resume_audio_stream:", e)
 
     def stopped_speaking(self, _, value=None):
-        """Handle end of animated speech event to resume audio streaming"""
-        print("AUDIO: End of animated speech detected - resuming audio stream")
+        """Handle end of animated speech event - but don't automatically resume if still speaking"""
+        logger.info("End of animated speech detected")
         
-        self.isSpeaking = False
-        global_speaking_state = self.isSpeaking  # Update global speaking state
+        # Unsubscribe from the event
+        try:
+            self.memory.unsubscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName())
+        except:
+            pass
         
-        self.resume_audio_stream()
+        # Only resume if the global Speaking state is actually False
+        # This prevents resuming between queued messages
+        try:
+            current_speaking_state = self.memory.getData("ALMemory/Speaking")
+            if not current_speaking_state:
+                logger.info("Global speaking is False, resuming audio stream")
+                self.isSpeaking = False
+                global_speaking_state = self.isSpeaking
+                self.resume_audio_stream()
+            else:
+                logger.info("Global speaking still True, keeping audio paused for next message")
+        except:
+            # Fallback - if we can't read Speaking state, assume we should resume
+            logger.warning("Cannot read Speaking state, resuming audio stream")
+            self.isSpeaking = False
+            global_speaking_state = self.isSpeaking
+            self.resume_audio_stream()
 
     def enable_stream(self):
         """Enable audio streaming using GStreamer"""
         if self.isStreamingEnabled:
-            print("CONTROL: Audio streaming already enabled")
+            logger.info("CONTROL: Audio streaming already enabled")
             return
             
         if not self.check_gstreamer_availability():
-            print("ERR: Cannot enable streaming - GStreamer not available")
+            logger.error("Cannot enable streaming - GStreamer not available")
             return
         
         # Test network connectivity
-        print("AUDIO: Testing network connectivity to {}:{}".format(self.target_host, self.target_port))
+        logger.info("Testing network connectivity to ", self.target_host, ":", self.target_port)
         if not self.test_network_connection():
-            print("WARN: Network connectivity test failed")
+            logger.warning("Network connectivity test failed")
         else:
-            print("AUDIO: Network connectivity test successful")
+            logger.info("Network connectivity test successful")
         
         # Start GStreamer pipeline
         if self.start_gstreamer_pipeline():
@@ -311,26 +331,25 @@ class AudioStreamModule(ALModule):
             
             # If currently speaking, start in paused state
             if self.isSpeaking:
-                print("AUDIO: Starting in paused state due to active speaking")
+                logger.info("Starting in paused state due to active speaking")
                 try:
                     self.pipeline.set_state(self.gst.STATE_PAUSED)
                 except Exception as e:
-                    print("ERR: Failed to pause pipeline on start: %s" % e)
+                    logger.error("Failed to pause pipeline on start:", e)
             
-            print("CONTROL: Audio streaming ENABLED - {}:{} (GStreamer RTP/L16)".format(
-                self.target_host, self.target_port))
+            logger.info("CONTROL: Audio streaming ENABLED -", self.target_host, self.target_port, "(GStreamer RTP/L16)")
         else:
-            print("ERR: Failed to enable audio streaming")
+            logger.error("Failed to enable audio streaming")
 
     def disable_stream(self):
         """Disable audio streaming"""
         if not self.isStreamingEnabled:
-            print("CONTROL: Audio streaming already disabled")
+            logger.info("CONTROL: Audio streaming already disabled")
             return
             
         self.isStreamingEnabled = False
         self.stop_gstreamer_pipeline()
-        print("CONTROL: Audio streaming DISABLED")
+        logger.info("CONTROL: Audio streaming DISABLED")
 
     def set_target(self, host, port):
         """Change target host and port for streaming"""
@@ -341,7 +360,7 @@ class AudioStreamModule(ALModule):
         
         self.target_host = host
         self.target_port = port
-        print("INF: Audio stream target changed to {}:{}".format(host, port))
+        logger.info("Audio stream target changed to", host, port)
         
         if was_streaming:
             self.enable_stream()
@@ -357,26 +376,6 @@ class AudioStreamModule(ALModule):
             'format': 'RTP/L16' if self.check_gstreamer_availability() else 'unavailable'
         }
 
-    # Legacy methods for compatibility with existing code
-    def start(self):
-        """Legacy start method - not needed for GStreamer approach"""
-        pass
-        
-    def stop(self):
-        """Legacy stop method"""
-        self.disable_stream()
-        was_streaming = self.isStreamingEnabled
-        
-        if was_streaming:
-            self.disable_stream()
-        
-        self.target_host = host
-        self.target_port = port
-        print("INF: Audio stream target changed to {}:{}".format(host, port))
-        
-        if was_streaming:
-            self.enable_stream()
-
     def get_streaming_status(self):
         """Get current streaming status"""
         return {
@@ -387,56 +386,7 @@ class AudioStreamModule(ALModule):
             'format': 'RTP/L16' if self.check_gstreamer_availability() else 'unavailable'
         }
 
-    # Legacy methods for compatibility with existing code
-    def start(self):
-        """Legacy start method - not needed for GStreamer approach"""
-        pass
-        
-    def stop(self):
-        """Legacy stop method"""
-        self.disable_stream()
-        
-    def processRemote(self, nbOfChannels, nbrOfSamplesByChannel, aTimeStamp, buffer):
-        """Legacy processRemote method - not needed for GStreamer approach"""
-        # GStreamer handles audio capture directly from ALSA
-        pass
-        try:
-            # Convert to float for filtering
-            data_float = data.astype(np.float32)
-            filtered_data = np.zeros_like(data_float)
-            
-            # Simple 3-tap FIR filter to reduce aliasing
-            # Coefficients for basic low-pass filter
-            a0, a1, a2 = 0.25, 0.5, 0.25
-            
-            for i in range(len(data_float)):
-                if i == 0:
-                    # Use history for first sample
-                    filtered_data[i] = (a0 * self.filter_history[2] + 
-                                      a1 * self.filter_history[1] + 
-                                      a2 * data_float[i])
-                elif i == 1:
-                    filtered_data[i] = (a0 * self.filter_history[1] + 
-                                      a1 * data_float[i-1] + 
-                                      a2 * data_float[i])
-                else:
-                    filtered_data[i] = (a0 * data_float[i-2] + 
-                                      a1 * data_float[i-1] + 
-                                      a2 * data_float[i])
-            
-            # Update filter history for next call
-            if len(data_float) >= 2:
-                self.filter_history = [data_float[-2], data_float[-1], data_float[-1]]
-            elif len(data_float) == 1:
-                self.filter_history = [self.filter_history[1], self.filter_history[2], data_float[0]]
-            
-            return filtered_data.astype(np.int16)
-            
-        except Exception as e:
-            print("WARN: Filter error, using unfiltered data: {}".format(e))
-            return data
-
-    def proper_downsample_48k_to_16k(self, audio_48k):
+    def downsample_48k_to_16k(self, audio_48k):
         """Properly downsample from 48kHz to 16kHz with anti-aliasing"""
         try:
             # Apply anti-aliasing filter first
@@ -451,7 +401,7 @@ class AudioStreamModule(ALModule):
             return downsampled
             
         except Exception as e:
-            print("ERR: Downsampling failed: {}".format(e))
+            logger.error("Downsampling failed:", e)
             # Fallback to simple decimation if filter fails
             return audio_48k[::3].astype(np.int16)
 
@@ -469,7 +419,7 @@ class AudioStreamModule(ALModule):
             frontMicData = aSoundData[0]
             
             # Proper downsampling from 48kHz to 16kHz with anti-aliasing
-            downsampledData = self.proper_downsample_48k_to_16k(frontMicData)
+            downsampledData = self.downsample_48k_to_16k(frontMicData)
             
             # Add to buffer
             self.audioBuffer.extend(downsampledData)
@@ -509,12 +459,12 @@ class AudioStreamModule(ALModule):
             
             # Debug logging every 100 chunks (~1.6 seconds)
             if self.audio_chunks_processed % 100 == 0 and self.audio_chunks_processed > 0:
-                print("AUDIO: Processed {} chunks, {} samples, buffer: {}, RTP seq: {}, skipped: {}".format(
-                    self.audio_chunks_processed, self.audio_samples_processed, 
-                    len(self.audioBuffer), self.sequence_number, self.packets_skipped))
-                
+                logger.debug("Processed", self.audio_chunks_processed, "chunks, ", self.audio_samples_processed,
+                             "samples, buffer: ", len(self.audioBuffer), "RTP seq:", self.sequence_number, "skipped:",
+                             self.packets_skipped)
+
         except Exception as e:
-            print("ERR: AudioStreamModule processRemote error: %s" % str(e))
+            logger.error("AudioStreamModule processRemote error:", str(e))
             traceback.print_exc()
 
     def send_rtp_audio_packet(self, audio_data, send_time):
@@ -523,8 +473,8 @@ class AudioStreamModule(ALModule):
             # Ensure exactly 256 samples
             audio_array = np.array(audio_data, dtype=np.int16)
             if len(audio_array) != CHUNK_SIZE:
-                print("WARN: Audio chunk size mismatch: expected {}, got {}".format(
-                    CHUNK_SIZE, len(audio_array)))
+                logger.warning("Audio chunk size mismatch: expected %d, got %d",
+                    CHUNK_SIZE, len(audio_array))
                 # Pad or truncate to exact size
                 if len(audio_array) < CHUNK_SIZE:
                     padding = np.zeros(CHUNK_SIZE - len(audio_array), dtype=np.int16)
@@ -545,7 +495,7 @@ class AudioStreamModule(ALModule):
             
             # Verify payload size (256 samples * 2 bytes = 512 bytes)
             if len(audio_bytes) != 512:
-                print("ERR: Audio payload size incorrect: {} bytes (expected 512)".format(len(audio_bytes)))
+                logger.error("Audio payload size incorrect: %d bytes (expected 512)", len(audio_bytes))
                 return
             
             # Create complete RTP packet
@@ -554,8 +504,8 @@ class AudioStreamModule(ALModule):
             
             # Verify total packet size
             if len(rtp_packet) != total_packet_size:
-                print("ERR: RTP packet size incorrect: {} bytes (expected {})".format(
-                    len(rtp_packet), total_packet_size))
+                logger.error("RTP packet size incorrect: %d bytes (expected %d)",
+                    len(rtp_packet), total_packet_size)
                 return
             
             # Send RTP packet
@@ -563,8 +513,8 @@ class AudioStreamModule(ALModule):
                 bytes_sent = self.sock.sendto(rtp_packet, (self.target_host, self.target_port))
                 
                 if bytes_sent != len(rtp_packet):
-                    print("RTP: WARNING - Partial send: {} of {} bytes".format(
-                        bytes_sent, len(rtp_packet)))
+                    logger.warning("RTP: WARNING - Partial send: %d of %d bytes",
+                        bytes_sent, len(rtp_packet))
                 
                 # Update RTP session state
                 self.last_packet_time = send_time
@@ -576,9 +526,9 @@ class AudioStreamModule(ALModule):
                 # Detailed logging every 10 packets
                 if self.sequence_number % 10 == 0:
                     rms = np.sqrt(np.mean(audio_array.astype(np.float32) ** 2)) if len(audio_array) > 0 else 0
-                    print("RTP: seq:{} ts:{} -> {}:{} | {}B | RMS:{:.0f} | time:{:.3f}s".format(
+                    logger.debug("RTP: seq:%d ts:%d -> %s:%d | %dB | RMS:%.0f | time:%.3fs",
                         self.sequence_number, self.rtp_timestamp, self.target_host, self.target_port, 
-                        len(rtp_packet), rms, send_time))
+                        len(rtp_packet), rms, send_time)
                 
                 # Network stats every 50 packets
                 if self.sequence_number % 50 == 0:
@@ -587,40 +537,40 @@ class AudioStreamModule(ALModule):
                         actual_rate = 50.0 / elapsed
                         expected_rate = 1.0 / PACKET_INTERVAL
                         rate_accuracy = (actual_rate / expected_rate * 100)
-                        print("RTP: Rate {:.1f}/{:.1f} pkt/s ({:.1f}%) | SSRC:0x{:08X} | {} errs".format(
-                            actual_rate, expected_rate, rate_accuracy, self.ssrc, self.network_errors))
+                        logger.debug("RTP: Rate %.1f/%.1f pkt/s (%.1f%%) | SSRC:0x%08X | %d errs",
+                            actual_rate, expected_rate, rate_accuracy, self.ssrc, self.network_errors)
                     self.last_network_log_time = send_time
                 
             except socket.error as e:
                 self.network_errors += 1
-                print("RTP: Socket error #{}: {}".format(self.network_errors, e))
+                logger.error("RTP: Socket error #%d:", self.network_errors, e)
                 
                 # Recreate socket after multiple errors
                 if self.network_errors % 10 == 0:
-                    print("RTP: Recreating socket after {} errors".format(self.network_errors))
+                    logger.warning("RTP: Recreating socket after %d errors", self.network_errors)
                     try:
                         self.sock.close()
                         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                        print("RTP: Socket recreated successfully")
+                        logger.info("RTP: Socket recreated successfully")
                     except Exception as recreate_error:
-                        print("RTP: Failed to recreate socket: {}".format(recreate_error))
+                        logger.error("RTP: Failed to recreate socket:", recreate_error)
             
             # Volume display every 50 packets
             if self.sequence_number % 50 == 0:
                 rms = np.sqrt(np.mean(audio_array.astype(np.float32) ** 2)) if len(audio_array) > 0 else 0
                 volume_bar = '#' * min(20, int(rms // 1000))
-                print("Volume: [{}{}] {:.0f} RMS (seq: {})".format(
-                    volume_bar, ' ' * (20 - len(volume_bar)), rms, self.sequence_number))
+                logger.debug("Volume: [%s%s] %.0f RMS (seq: %d)",
+                    volume_bar, ' ' * (20 - len(volume_bar)), rms, self.sequence_number)
                 
         except Exception as e:
-            print("ERR: Failed to send RTP audio packet: %s" % str(e))
+            logger.error("Failed to send RTP audio packet:", str(e))
             traceback.print_exc()
 
     def set_target(self, host, port):
         """Change target host and port for RTP streaming"""
         self.target_host = host
         self.target_port = port
-        print("INF: RTP Audio stream target changed to {}:{}".format(host, port))
+        logger.info("RTP Audio stream target changed to %s:%s", host, port)
 
     def get_sequence(self):
         """Get current RTP sequence number"""
@@ -641,7 +591,7 @@ class AudioStreamModule(ALModule):
 
     def __del__(self):
         """Enhanced destructor that handles all cleanup gracefully"""
-        print("INF: AudioStreamModule.__del__: cleaning everything")
+        logger.info("cleaning everything")
         
         try:
             # Disable streaming if active
@@ -670,10 +620,28 @@ class AudioStreamModule(ALModule):
                     except:
                         pass
                 except Exception as e:
-                    print("WARN: Could not unsubscribe from audio stream events: {}".format(e))
+                    logger.warning("Could not unsubscribe from audio stream events:", e)
                     
         except Exception as e:
-            print("ERR: Error during AudioStreamModule cleanup: {}".format(e))
+            logger.error("Error during AudioStreamModule cleanup:", e)
         finally:
-            print("INF: AudioStreamModule: cleaned up!")
+            logger.info("cleaned up!")
+
+    def stop(self):
+        """Stop the audio stream module and clean up"""
+        try:
+            self.disable_stream()
+            
+            # Unsubscribe from events
+            try:
+                if hasattr(self, 'memory'):
+                    self.memory.unsubscribe("ControlAudioStreaming", self.getName())
+                    self.memory.unsubscribe("Speaking", self.getName())
+            except Exception as e:
+                logger.warning("Could not unsubscribe from audio stream events:", e)
+                
+        except Exception as e:
+            logger.error("Error during AudioStreamModule stop:", e)
+        finally:
+            logger.info("stopped!")
 

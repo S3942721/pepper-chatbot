@@ -1,5 +1,6 @@
 from naoqi import ALProxy, ALModule
 import threading
+import logger
 
 class MotionModule(ALModule):
     def __init__(self, name, nao_ip, nao_port):
@@ -69,14 +70,14 @@ class MotionModule(ALModule):
 
     def on_control_movement_speed(self, _, value):
         self.movement_speed = value
-        print("Movement speed set to: {}".format(self.movement_speed))
+        logger.info("Movement speed set to:", self.movement_speed)
 
     def on_move(self, name, move_data):
-        print("MOVE FROM: ", name)
+        logger.debug("MOVE FROM:", name)
         if not self.motion_enabled:
-            print("Movement is disabled, ignoring move event")
+            logger.warning("Movement is disabled, ignoring move event")
             return
-        print("Received move event with value: {}".format(move_data))
+        logger.debug("Received move event with value:", move_data)
         self.reset_move_timer()
 
         if name == "ContinuousMove":
@@ -99,20 +100,20 @@ class MotionModule(ALModule):
             self.memory.raiseEvent("ControlAwareness", False)
             self.memory.raiseEvent("ControlContextMovement", False)
             self.motion.move(x_vel, y_vel, theta, self.move_config)
-            print("Moving continuously with x: {}, y: {}".format(x, y))
+            logger.debug("Moving continuously with x:", x, "y:", y)
 
             # Head movement
             head_pitch = -controller_hy * self.head_speed
             head_yaw = -controller_hx * self.head_speed
             self.motion.changeAngles(["HeadPitch", "HeadYaw"], [head_pitch, head_yaw], self.head_speed)
-            print("Moving head with pitch: {}, yaw: {}".format(head_pitch, head_yaw))
+            logger.debug("Moving head with pitch:", head_pitch, "yaw:", head_yaw)
         else:
             x, y, theta = 0.0, 0.0, 0.0
             key, holding = move_data
             for key_data in self.keys_pressed:
                 if key_data["key"] == key:
                     key_data["holding"] = holding
-                    print("Updated key press data: {}".format(self.keys_pressed))
+                    logger.debug("Updated key press data:", self.keys_pressed)
 
             for i, key in enumerate(self.KEYS):
                 if self.keys_pressed[int(i)]["holding"]:
@@ -128,7 +129,7 @@ class MotionModule(ALModule):
                         theta += self.turn_speed
                     elif key == "E":
                         theta -= self.turn_speed
-                    print("Key {} is being held. Updated movement values to x: {}, y: {}, theta: {}".format(key, x, y, theta))
+                    logger.debug("Key", key, "is being held. Updated movement values to x:", x, "y:", y, "theta:", theta)
 
             if x == 0.0 and y == 0.0 and theta == 0.0:
                 self.stop_moving(None, "MoveTimeout")
@@ -140,7 +141,7 @@ class MotionModule(ALModule):
                 self.memory.raiseEvent("ControlAwareness", False)
                 self.memory.raiseEvent("ControlContextMovement", False)
                 self.motion.move(x, y, theta, self.move_config)
-                print("Moving with x: {}, y: {}, theta: {}".format(x, y, theta))
+                logger.debug("Moving with x:", x, "y:", y, "theta:", theta)
 
             if any(key_data["holding"] for key_data in self.keys_pressed if key_data["key"] in ["ARROWUP", "ARROWDOWN", "ARROWLEFT", "ARROWRIGHT"]):
                 if self.head_movement_thread is None or not self.head_movement_thread.is_alive():
@@ -199,29 +200,29 @@ class MotionModule(ALModule):
 
     def stop_moving(self, _, value):
         self.motion.stopMove()
-        print("Stopped moving")
+        logger.info("Stopped moving")
         if value == "MoveTimeout":
             self.memory.raiseEvent("ControlEngagement", self.previous_engagement)
             self.memory.raiseEvent("ControlAwareness", self.previous_awareness)
             self.memory.raiseEvent("ControlContextMovement", self.previous_context_movement)
         if self.move_timer:
-            print("No message received, stopping movement timer for safety")
+            logger.info("No message received, stopping movement timer for safety")
             self.move_timer.cancel()
             self.move_timer = None
 
     def on_control_turn_speed(self, _, value):
         self.turn_speed = value
-        print("Turn speed set to: {}".format(self.turn_speed))
+        logger.info("Turn speed set to:", self.turn_speed)
 
     def on_control_movement_timeout(self, _, value):
         self.move_timeout = value
-        print("Movement timeout set to: {}".format(self.move_timeout))
+        logger.info("Movement timeout set to:", self.move_timeout)
 
     def on_control_movement(self, _, value):
         self.motion_enabled = value
         if not self.motion_enabled:
             self.stop_moving(None, None)
-        print("Movement enabled set to: {}".format(self.motion_enabled))
+        logger.info("Movement enabled set to:", self.motion_enabled)
 
     def on_control_engagement(self, _, value):
         self.current_engagement = value
@@ -238,10 +239,10 @@ class MotionModule(ALModule):
         self.motion.setIdlePostureEnabled("Arms" ,bool(value))
         self.motion.setIdlePostureEnabled("Legs" ,bool(value))
         
-        print("Setting idle position to: {}".format(value))
+        logger.info("Setting idle position to:", value)
 
     def on_control_collision_avoidance(self, _, value):
-        print("Setting collision avoidance to: {}".format(value))
+        logger.info("Setting collision avoidance to:", value)
         if not value:
             self.motion.setTangentialSecurityDistance(0.01)
             self.motion.setOrthogonalSecurityDistance(0.01)
@@ -257,11 +258,11 @@ class MotionModule(ALModule):
             self.head_lock_stop_event = threading.Event()
             self.head_lock_thread = threading.Thread(target=self.head_lock_loop, args=(head_pitch, head_yaw))
             self.head_lock_thread.start()
-            print("Head locked at pitch: {}, yaw: {}".format(head_pitch, head_yaw))
+            logger.info("Head locked at pitch:", head_pitch, "yaw:", head_yaw)
         else:
             if hasattr(self, 'head_lock_stop_event'):
                 self.head_lock_stop_event.set()
-                print("Head lock released")
+                logger.info("Head lock released")
 
     def head_lock_loop(self, head_pitch, head_yaw):
         while not self.head_lock_stop_event.is_set():

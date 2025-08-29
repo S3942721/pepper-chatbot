@@ -7,6 +7,7 @@ import json
 import threading
 import random
 import Queue  # Python 2.7 queue module
+import logger
 
 class BaseSpeechReceiverModule(ALModule):
     """
@@ -83,7 +84,7 @@ class BaseSpeechReceiverModule(ALModule):
                 f.write('role,content\n')
                 f.close()
 
-        print("DEBUG: Initializing BehaviourExecutor with behaviour_file: {}".format(behaviours_file))
+        logger.debug("Initializing BehaviourExecutor with behaviour_file:", behaviours_file)
 
         TESTING_BEHAVIOURS = False
 
@@ -94,7 +95,7 @@ class BaseSpeechReceiverModule(ALModule):
                 animation_test, index = self.expressions.get_next_behaviour(index, previous_description)
                 if animation_test:
                     animation_test = str(self.expressions.sanitize_behaviour_requests(animation_test)[0])
-                    print("DEBUG: Running test behaviour: {}".format(animation_test))
+                    logger.debug("Running test behaviour:", animation_test)
                     self.speech.say(animation_test)
                     
                     # Wait for user input for the behaviour description
@@ -107,7 +108,7 @@ class BaseSpeechReceiverModule(ALModule):
                         description = "<NO DESCRIPTION>"
                     
                     # Log the behaviour and description
-                    print("DEBUG: Behaviour: {}, Description: {}".format(animation_test, description))
+                    logger.debug("Behaviour:", animation_test, "Description:", description)
                     previous_description = description
                 else:
                     break
@@ -118,7 +119,7 @@ class BaseSpeechReceiverModule(ALModule):
     # __init__ - end
     def __del__( self ):
         """Enhanced destructor that handles all cleanup gracefully"""
-        print( "INF: ReceiverModule.__del__: cleaning everything" )
+        logger.info("cleaning everything")
         
         # Set shutdown flag to prevent new message processing
         self.shutting_down = True
@@ -154,7 +155,7 @@ class BaseSpeechReceiverModule(ALModule):
                     self.memory.unsubscribe('Listening', self.getName())
                     self.memory.unsubscribe('TriggerGapFill', self.getName())
                 except Exception as e:
-                    print("WARN: Could not unsubscribe from receiver events: {}".format(e))
+                    logger.warning("Could not unsubscribe from receiver events:", e)
             
             # Stop listening thread
             if hasattr(self, 'stop_listening_thread'):
@@ -169,18 +170,18 @@ class BaseSpeechReceiverModule(ALModule):
                     pass
                     
         except Exception as e:
-            print("ERR: Error during ReceiverModule cleanup: {}".format(e))
+            logger.error("Error during ReceiverModule cleanup:", e)
         finally:
-            print( "INF: ReceiverModule: cleaned up!" )
+            logger.info("cleaned up!")
 
     def sync_messages(self):
         self.memory.raiseEvent("SyncMessages", json.dumps(self.messages))
 
     def pepper_message(self, _, value):
-        print("DEBUG: Pepper message event received with value {}".format(value))     
+        logger.debug("Pepper message event received with value", value)     
 
     def finished_speaking(self, _, value):
-        print("DEBUG: Clear display event received")
+        logger.debug("Clear display event received")
         self.memory.raiseEvent("PepperMessage", None)
         
         # Signal that speech has finished
@@ -200,14 +201,14 @@ class BaseSpeechReceiverModule(ALModule):
         if queue_empty:
             # Ensure other modules know speaking ended (so audio streaming resumes consistently)
             self.memory.raiseEvent("Speaking", False)
-            print("DEBUG: Speaking False raised (no queued messages)")
+            logger.debug("Speaking False raised (no queued messages)")
         else:
             # Keep Speaking True while queued items remain; worker will handle next item.
-            print("DEBUG: Speaking remains True ({} queued) - keeping audio paused".format(self.message_queue.qsize()))
+            logger.debug("Speaking remains True", self.message_queue.qsize(), "queued - keeping audio paused")
             # Don't raise Speaking False event - keep audio stream paused
 
     def stop_speech(self, _, value):
-        print("DEBUG: Stop speech event received")
+        logger.debug("Stop speech event received")
         threading.Thread(target=self._stop_speech, args=(_, value)).start()
 
     def _stop_speech(self, _, value):
@@ -216,7 +217,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.clear_all(_, value)
 
     def stop_behaviour(self, _, value):
-        print("DEBUG: Stop behaviour event received")
+        logger.debug("Stop behaviour event received")
         threading.Thread(target=self._stop_behaviour, args=(_, value)).start()
 
     def _stop_behaviour(self, _, value):
@@ -225,7 +226,7 @@ class BaseSpeechReceiverModule(ALModule):
         bhv_manager.stopAllBehaviors()
 
     def stop_audio(self, _, value):
-        print("DEBUG: Stop audio event received")
+        logger.debug("Stop audio event received")
         threading.Thread(target=self._stop_audio, args=(_, value)).start()
 
     def _stop_audio(self, _, value):
@@ -240,7 +241,7 @@ class BaseSpeechReceiverModule(ALModule):
         the queue here we risk discarding the very Say we are about to enqueue.
         Keep behaviour stopping but preserve the queue so incoming Say/SayChunk will run.
         """
-        print("DEBUG: Stop all event received - stopping speech and behaviours (queue preserved)")
+        logger.debug("Stop all event received - stopping speech and behaviours (queue preserved)")
 
         # Stop current speech only (allow pending queued messages to be processed)
         self.stop_current_speech()
@@ -253,7 +254,7 @@ class BaseSpeechReceiverModule(ALModule):
 
     def clear_all(self, name, value):
         """Enhanced clear all to clear message queue"""
-        print("DEBUG: clear_all event received from {}".format(name))
+        logger.debug("clear_all event received from", name)
         # Clear the message queue
         self.clear_message_queue()
         
@@ -261,7 +262,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.reset_message()
         self.conversation_ongoing = False
         self.memory.raiseEvent("ConversationOngoing", False)
-        print("DEBUG: Speaking False called in clear_all")
+        logger.debug("Speaking False called in clear_all")
         self.memory.raiseEvent("Speaking", False)
         self.memory.raiseEvent("RunningBehaviour", False)
 
@@ -278,11 +279,11 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("Say", self.getName(), "processRemote")
         self.memory.subscribeToEvent("JSONSay", self.getName(), "processRemote")
         self.memory.subscribeToEvent("SayChunk", self.getName(), "processRemote")
-        print( "INF: ReceiverModule: started!" )
+        logger.info("started!")
 
     def stop( self ):
         """Enhanced stop to shutdown queue worker"""
-        print( "INF: ReceiverModule: stopping..." )
+        logger.info("stopping...")
         try:
             # Stop the queue worker
             self.stop_queue_worker()
@@ -294,7 +295,7 @@ class BaseSpeechReceiverModule(ALModule):
             if hasattr(self, 'listening_thread') and self.listening_thread.is_alive():
                 self.listening_thread.join()
         finally:
-            print( "INF: ReceiverModule: stopped!" )
+            logger.info("stopped!")
 
     def trigger_gap_fill(self, _, value):
         self.disable_thinking = not value
@@ -305,7 +306,7 @@ class BaseSpeechReceiverModule(ALModule):
     
     def handle_listening(self, _, is_listening):
         # Runs a thread that indefinitely runs random listening behaviours until the thread is stopped
-        print("DEBUG: Listening event received with value: {}".format(is_listening))
+        logger.debug("Listening event received with value:", is_listening)
         if is_listening:
             # We are listening. We should start running "listening" behaviours
             self.listening = True
@@ -342,7 +343,7 @@ class BaseSpeechReceiverModule(ALModule):
             self.queue_worker_thread = threading.Thread(target=self.process_message_queue)
             self.queue_worker_thread.daemon = True
             self.queue_worker_thread.start()
-            print("DEBUG: Message queue worker started")
+            logger.debug("Message queue worker started")
 
     def stop_queue_worker(self):
         """Stop the message queue worker thread"""
@@ -351,11 +352,11 @@ class BaseSpeechReceiverModule(ALModule):
             # Add a special stop message to wake up the queue
             self.message_queue.put({"type": "STOP_WORKER"})
             self.queue_worker_thread.join(timeout=5)
-            print("DEBUG: Message queue worker stopped")
+            logger.debug("Message queue worker stopped")
 
     def process_message_queue(self):
         """Worker thread to process messages from the queue"""
-        print("DEBUG: Queue worker thread started")
+        logger.debug("Queue worker thread started")
         
         while self.queue_running:
             try:
@@ -376,9 +377,9 @@ class BaseSpeechReceiverModule(ALModule):
                 # Timeout occurred, continue loop
                 continue
             except Exception as e:
-                print("ERR: Queue worker error: {}".format(e))
+                logger.error("Queue worker error:", e)
                 
-        print("DEBUG: Queue worker thread ended")
+        logger.debug("Queue worker thread ended")
 
     def process_queued_message(self, message_item):
         """Process a single message from the queue"""
@@ -388,8 +389,7 @@ class BaseSpeechReceiverModule(ALModule):
             speech_id = message_item.get("speech_id")
             is_chunk = message_item.get("is_chunk", False)
             
-            print("DEBUG: Processing queued message - Signal: {}, Speech ID: {}, Is Chunk: {}".format(
-                signal_name, speech_id, is_chunk))
+            logger.debug("Processing queued message - Signal:", signal_name, "Speech ID:", speech_id, "Is Chunk:", is_chunk)
             
             # Handle chunked responses
             if is_chunk and speech_id:
@@ -397,18 +397,18 @@ class BaseSpeechReceiverModule(ALModule):
                 if self.current_speech_id != speech_id:
                     # Stop any current speech before starting new one
                     if self.is_currently_speaking:
-                        print("DEBUG: Stopping current speech for new chunk session")
+                        logger.debug("Stopping current speech for new chunk session")
                         self.stop_current_speech()
                     
                     self.current_speech_id = speech_id
-                    print("DEBUG: Starting new chunked speech session: {}".format(speech_id))
+                    logger.debug("Starting new chunked speech session:", speech_id)
                 
                 # For chunked responses, append to current speech or start new
                 self.handle_chunked_speech(message, speech_id)
             else:
                 # Regular non-chunked message processing
                 if self.is_currently_speaking:
-                    print("DEBUG: Stopping current speech for new message")
+                    logger.debug("Stopping current speech for new message")
                     self.stop_current_speech()
                 
                 # Process as regular message
@@ -419,26 +419,26 @@ class BaseSpeechReceiverModule(ALModule):
                 with self.queue_lock:
                     queue_empty_after_processing = self.message_queue.empty()
                 if queue_empty_after_processing and not self.is_currently_speaking:
-                    print("DEBUG: Queue empty after processing, ensuring Speaking False")
+                    logger.debug("Queue empty after processing, ensuring Speaking False")
                     self.memory.raiseEvent("Speaking", False)
             except Exception:
                 pass
                 
         except Exception as e:
-            print("ERR: Error processing queued message: {}".format(e))
+            logger.error("Error processing queued message:", e)
 
     def handle_chunked_speech(self, message, speech_id):
         """Handle chunked speech responses"""
         try:
             # Don't set speaking state here - it should already be True from previous chunks
             # or will be set in process_speech_response
-            print("DEBUG: Handling chunked speech for session: {}".format(speech_id))
+            logger.debug("Handling chunked speech for session:", speech_id)
             
             # Process the message chunk
             self.process_speech_chunk(message)
             
         except Exception as e:
-            print("ERR: Error handling chunked speech: {}".format(e))
+            logger.error("Error handling chunked speech:", e)
 
     def process_speech_chunk(self, message):
         """Process a single chunk of speech"""
@@ -452,7 +452,7 @@ class BaseSpeechReceiverModule(ALModule):
                 self.process_speech_response(resp_text, is_chunk=True)
                 
         except Exception as e:
-            print("ERR: Error processing speech chunk: {}".format(e))
+            logger.error("Error processing speech chunk:", e)
 
     def stop_current_speech(self):
         """Stop current speech without triggering global StopAction (preserve queue)."""
@@ -482,9 +482,9 @@ class BaseSpeechReceiverModule(ALModule):
 
                 # Update state
                 self.is_currently_speaking = False
-                print("DEBUG: Current speech stopped (direct stop)")
+                logger.debug("Current speech stopped (direct stop)")
         except Exception as e:
-            print("ERR: Error stopping current speech: {}".format(e))
+            logger.error("Error stopping current speech:", e)
 
     def clear_message_queue(self):
         """Clear all pending messages from the queue"""
@@ -499,7 +499,7 @@ class BaseSpeechReceiverModule(ALModule):
             
             # Reset speech state
             self.current_speech_id = None
-            print("DEBUG: Message queue cleared")
+            logger.debug("Message queue cleared")
 
     def processRemote(self, signalName, message):
         """Add messages to queue instead of processing directly"""
@@ -507,11 +507,11 @@ class BaseSpeechReceiverModule(ALModule):
         if getattr(self, 'shutting_down', False):
             return
             
-        print("DEBUG: Received from: {}".format(signalName))
-        print("DEBUG: Received message: {}".format(message))
+        logger.debug("Received from:", signalName)
+        logger.debug("Received message:", message)
         
         if message is None:
-            print("DEBUG: Received message is None. Ignoring.")
+            logger.debug("Received message is None. Ignoring.")
             return
         
         # Check if this is a special signal that should be handled directly
@@ -539,14 +539,13 @@ class BaseSpeechReceiverModule(ALModule):
         # Add to queue
         try:
             self.message_queue.put(message_item, timeout=1)
-            print("DEBUG: Message added to queue - Speech ID: {}, Is Chunk: {}, Queue size: {}".format(
-                speech_id, is_chunk, self.message_queue.qsize()))
+            logger.debug("Message added to queue - Speech ID:", speech_id, "Is Chunk:", is_chunk, "Queue size:", self.message_queue.qsize())
         except Queue.Full:
-            print("ERR: Message queue is full, dropping message")
+            logger.error("Message queue is full, dropping message")
 
     def process_message_directly(self, signalName, message):
         """Process message directly (moved from original processRemote)"""
-        print("DEBUG: Processing message directly - Signal: {}, Message: {}".format(signalName, message))
+        logger.debug("Processing message directly - Signal:", signalName, "Message:", message)
         
         # Convert the message to json if it is not already and it's a Say signal
         if message and signalName == self.SAY_SIGNAL:
@@ -570,14 +569,14 @@ class BaseSpeechReceiverModule(ALModule):
         if signalName == "SpeechRecognition":
             # Set speaking state for speech recognition processing
             self.memory.raiseEvent("Speaking", True)
-            print("DEBUG: Speaking True set for speech recognition processing")
+            logger.debug("Speaking True set for speech recognition processing")
             
             # Add user message to conversation
             self.messages.append({'role':'user','content':message})
             self.messages_to_llm.append({'role':'user','content':message})
             self.sync_messages()
             
-            print("User Speech Recognition Result:\n================================\n"+message+"\n================================\n")
+            logger.info("User Speech Recognition Result:\n================================\n", message, "\n================================\n")
             
             # Send to chat completion API
             try:
@@ -592,11 +591,11 @@ class BaseSpeechReceiverModule(ALModule):
                 if resp_text:
                     self.process_speech_response(resp_text, is_chunk=False)
                 else:
-                    print("DEBUG: No response from chat completion API")
+                    logger.debug("No response from chat completion API")
                     self.memory.raiseEvent("Speaking", False)
                     
             except Exception as e:
-                print("ERR: Chat completion API error: {}".format(e))
+                logger.error("Chat completion API error:", e)
                 self.memory.raiseEvent("Speaking", False)
 
     def _strip_brace_segments(self, text):
@@ -614,7 +613,7 @@ class BaseSpeechReceiverModule(ALModule):
         if json_start != -1 and json_end != -1:
             resp_text = resp_text[json_start:json_end]
         else:
-            print("DEBUG: No valid JSON found in response text.")
+            logger.debug("No valid JSON found in response text.")
             if not is_chunk:
                 self.finish_speech_processing()
             return
@@ -634,7 +633,7 @@ class BaseSpeechReceiverModule(ALModule):
                         self.memory.raiseEvent("ConversationOngoing", True)
 
                     if not chat_response:
-                        print("DEBUG: Message does not contain 'chat_response' or told not to respond.")
+                        logger.debug("Message does not contain 'chat_response' or told not to respond.")
                         if not is_chunk:
                             self.finish_speech_processing()
                         return
@@ -646,13 +645,13 @@ class BaseSpeechReceiverModule(ALModule):
                         resp_message = chat_response
                     
                     else:
-                        print("DEBUG: Message does not contain 'chat_response'.")
+                        logger.debug("Message does not contain 'chat_response'.")
                         if not is_chunk:
                             self.finish_speech_processing()
                         return
 
                 except (SyntaxError, KeyError) as e:
-                    print("DEBUG: Failed to decode message: {}".format(e))
+                    logger.debug("Failed to decode message:", e)
                     if not is_chunk:
                         self.finish_speech_processing()
                     return
@@ -660,13 +659,13 @@ class BaseSpeechReceiverModule(ALModule):
                 # Strip brace segments (e.g. { ... }) from what will be spoken
                 resp_message = self._strip_brace_segments(resp_message)
                 if not resp_message:
-                    print("DEBUG: Response empty after stripping brace segments. Cancelling speech segment.")
+                    logger.debug("Response empty after stripping brace segments. Cancelling speech segment.")
                     if not is_chunk:
                         self.finish_speech_processing()
                     return
                 
                 # Display and process the message
-                print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
+                logger.info("AI Inference Result:\n================================\n", resp_message, "\n================================\n")
                 self.memory.raiseEvent("RunningBehaviour", True)
                 
                 # Mark speaking state and notify other modules (e.g. audio stream) BEFORE speaking
@@ -675,11 +674,11 @@ class BaseSpeechReceiverModule(ALModule):
                     self.is_currently_speaking = True
                     try:
                         self.memory.raiseEvent("Speaking", True)
-                        print("DEBUG: Speaking True set for speech response")
+                        logger.debug("Speaking True set for speech response")
                     except Exception:
                         pass
                 else:
-                    print("DEBUG: Already speaking, not toggling Speaking event")
+                    logger.debug("Already speaking, not toggling Speaking event")
 
                 # Execute the speech
                 self.speech.say(resp_message)
@@ -696,13 +695,14 @@ class BaseSpeechReceiverModule(ALModule):
                     self.memory.raiseEvent("ResetConversation", True)
 
         except Exception as e:
-            print("ERR: Error processing speech response: {}".format(e))
+            logger.error("Error processing speech response:", e)
             if not is_chunk:
                 self.finish_speech_processing()
-
     def _strip_brace_segments(self, text):
         # Remove any { ... } segments (and leading whitespace before them), then collapse extra spaces
         cleaned = re.sub(r'\s*\{[^}]*\}', '', text)
+        cleaned = re.sub(r' +', ' ', cleaned).strip()
+        return cleaned
         cleaned = re.sub(r' +', ' ', cleaned).strip()
         return cleaned
 
