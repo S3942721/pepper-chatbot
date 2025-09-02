@@ -94,7 +94,7 @@ class BaseSpeechReceiverModule(ALModule):
             while index != -1:
                 animation_test, index = self.expressions.get_next_behaviour(index, previous_description)
                 if animation_test:
-                    animation_test = str(self.expressions.sanitize_behaviour_requests(animation_test)[0])
+                    animation_test = str(self.expressions.sanitise_behaviour_requests(animation_test)[0])
                     logger.debug("Running test behaviour:", animation_test)
                     self.speech.say(animation_test)
                     
@@ -314,7 +314,7 @@ class BaseSpeechReceiverModule(ALModule):
             # LISTENING_BEHAVIOURS = ['listening'] # FIXME: This might be doing weird things....
             # random_behaviour = random.choice(LISTENING_BEHAVIOURS)
             # listening_message = "^start({})^wait({})".format(random_behaviour, random_behaviour)
-            # listening_message, _, _ = executor.sanitize_behaviour_requests(listening_message)
+            # listening_message, _, _ = executor.sanitise_behaviour_requests(listening_message)
             # speech.say(listening_message)
             time.sleep(1)
         
@@ -485,7 +485,7 @@ class BaseSpeechReceiverModule(ALModule):
                     self.message_queue.task_done()
                 except Queue.Empty:
                     break
-            
+
             # Reset speech state
             self.current_speech_id = None
             logger.debug("Message queue cleared")
@@ -495,13 +495,60 @@ class BaseSpeechReceiverModule(ALModule):
         # Don't process new messages during shutdown
         if getattr(self, 'shutting_down', False):
             return
-            
+
         logger.debug("Received from:", signalName)
         logger.debug("Received message:", message)
-        
+
         if message is None:
             logger.debug("Received message is None. Ignoring.")
             return
+
+        # Pre-sanitise speech chunks before queuing
+        sanitised_message = message
+        if signalName in [self.SAY_SIGNAL, self.JSON_SAY_SIGNAL, "SayChunk"]:
+            try:
+                # Extract JSON if needed
+                if signalName == self.SAY_SIGNAL:
+                    message_dict = {'chat_response': message, 'conversation_ongoing': False}
+                    json_message = json.dumps(message_dict)
+                else:
+                    json_message = message
+
+                # Parse JSON to get chat_response
+                json_start = json_message.find('{')
+                json_end = json_message.rfind('}') + 1
+                if json_start != -1 and json_end != -1:
+                    resp_text = json_message[json_start:json_end]
+                    resp_text = resp_text.encode('ascii', 'ignore').decode('ascii')
+                    
+                    try:
+                        message_dict = eval(resp_text.replace('true', 'True').replace('false', 'False'))
+                        chat_response = message_dict.get('chat_response', '')
+                        
+                        if chat_response and self.expressions:
+                            # Perform sanitisation early for speech chunks
+                            sanitised_response, behaviour_triggered, spoken_response = self.expressions.sanitise_request(chat_response)
+
+                            # Update the message dict with sanitised content
+                            message_dict['chat_response'] = sanitised_response
+                            message_dict['sanitised'] = True  # Mark as pre-sanitised
+                            message_dict['spoken_response'] = spoken_response
+                            message_dict['behaviour_triggered'] = behaviour_triggered
+                            
+                            # Convert back to JSON string
+                            sanitised_message = json.dumps(message_dict)
+                            logger.debug("Pre-sanitised speech chunk before queuing")
+                        else:
+                            sanitised_message = json_message
+                    except (SyntaxError, KeyError) as e:
+                        logger.debug("Failed to pre-sanitise message:", e)
+                        sanitised_message = json_message
+                else:
+                    sanitised_message = json_message
+                    
+            except Exception as e:
+                logger.debug("Error during pre-sanitisation:", e)
+                sanitised_message = message
         
         # Check if this is a special signal that should be handled directly
         if signalName == "SayChunk":
@@ -516,10 +563,10 @@ class BaseSpeechReceiverModule(ALModule):
             # Determine if this is likely a chunked response
             is_chunk = (signalName == self.SAY_SIGNAL or signalName == self.JSON_SAY_SIGNAL)
         
-        # Create message item for queue
+        # Create message item for queue with sanitised content
         message_item = {
             "signal": signalName,
-            "message": message,
+            "message": sanitised_message,
             "speech_id": speech_id if is_chunk else None,
             "is_chunk": is_chunk,
             "timestamp": time.time()
@@ -536,77 +583,9 @@ class BaseSpeechReceiverModule(ALModule):
         except Queue.Full:
             logger.error("Message queue is full, dropping message")
 
-    def process_message_directly(self, signalName, message):
-        """Process message directly (moved from original processRemote)"""
-        logger.debug("Processing message directly - Signal:", signalName, "Message:", message)
-        
-        # Convert the message to json if it is not already and it's a Say signal
-        if message and signalName == self.SAY_SIGNAL:
-            message_dict = {'chat_response': message, 'conversation_ongoing': False}
-            resp_text = json.dumps(message_dict)
-            # Process speech response directly
-            self.process_speech_response(resp_text, is_chunk=False)
-            return
-        
-        # Handle JSONSay signal
-        if signalName == self.JSON_SAY_SIGNAL:
-            self.process_speech_response(message, is_chunk=False)
-            return
-            
-        # Handle SayChunk signal for chunked responses
-        if signalName == "SayChunk":
-            self.process_speech_response(message, is_chunk=True)
-            return
-        
-        # Handle regular speech recognition from microphone
-        if signalName == "SpeechRecognition":
-            # Generate speech ID for this recognition session
-            self.speech_counter += 1
-            speech_id = "speech_{}".format(self.speech_counter)
-            
-            # Notify speaking manager we're starting to speak
-            self.memory.raiseEvent("StartSpeaking", speech_id)
-            logger.debug("Notified speaking manager to start speaking")
-            
-            # Add user message to conversation
-            self.messages.append({'role':'user','content':message})
-            self.messages_to_llm.append({'role':'user','content':message})
-            self.sync_messages()
-            
-            logger.info("User Speech Recognition Result:\n================================\n", message, "\n================================\n")
-            
-            # Send to chat completion API
-            try:
-                resp_text = chat_completion(
-                    self.server_url, 
-                    self.messages_to_llm, 
-                    route=self.base_route, 
-                    model_name=self.model_name,
-                    api_key=self.api_key
-                )
-                
-                if resp_text:
-                    self.process_speech_response(resp_text, is_chunk=False)
-                else:
-                    logger.debug("No response from chat completion API")
-                    # Stop speaking via speaking manager instead of direct Speaking event
-                    self.memory.raiseEvent("StopSpeaking", speech_id)
-                    
-            except Exception as e:
-                logger.error("Chat completion API error:", e)
-                # Stop speaking via speaking manager instead of direct Speaking event
-                self.memory.raiseEvent("StopSpeaking", speech_id)
-
-    def _strip_brace_segments(self, text):
-        # Remove any { ... } segments (and leading whitespace before them), then collapse extra spaces
-        cleaned = re.sub(r'\s*\{[^}]*\}', '', text)
-        cleaned = re.sub(r' +', ' ', cleaned).strip()
-        return cleaned
-
-
     def process_speech_response(self, resp_text, is_chunk=False):
         """Process speech response (extracted from original processRemote)"""
-        # Sanitize the response text to extract only the JSON component
+        # sanitise the response text to extract only the JSON component
         json_start = resp_text.find('{')
         json_end = resp_text.rfind('}') + 1
         if json_start != -1 and json_end != -1:
@@ -618,7 +597,7 @@ class BaseSpeechReceiverModule(ALModule):
             return
 
         try:
-            # Sanitize the response to text replace any non ascii characters with ascii equivalents
+            # sanitise the response to text replace any non ascii characters with ascii equivalents
             resp_text = resp_text.encode('ascii', 'ignore').decode('ascii')
 
             if resp_text:
@@ -627,6 +606,9 @@ class BaseSpeechReceiverModule(ALModule):
                     message_dict = eval(resp_text.replace('true', 'True').replace('false', 'False'))
                     chat_response = message_dict.get('chat_response', '')
                     self.conversation_ongoing = message_dict.get('conversation_ongoing', False)
+                    
+                    # Check if response was pre-sanitised
+                    pre_sanitised = message_dict.get('sanitised', False)
 
                     if self.conversation_ongoing is True:
                         self.memory.raiseEvent("ConversationOngoing", True)
@@ -639,9 +621,17 @@ class BaseSpeechReceiverModule(ALModule):
 
                     # If we want to respond, only respond if we have a chat_response
                     elif chat_response:
-                        # Sanitize the chat_response to replace behaviour requests with full paths
-                        chat_response, behaviour_triggered, spoken_response = self.expressions.sanitize_request(chat_response)
-                        resp_message = chat_response
+                        if pre_sanitised:
+                            # Use pre-sanitised content
+                            resp_message = chat_response
+                            spoken_response = message_dict.get('spoken_response', chat_response)
+                            behaviour_triggered = message_dict.get('behaviour_triggered', False)
+                            logger.debug("Using pre-sanitised content from queue")
+                        else:
+                            # sanitise the chat_response to replace behaviour requests with full paths
+                            chat_response, behaviour_triggered, spoken_response = self.expressions.sanitise_request(chat_response)
+                            resp_message = chat_response
+                            logger.debug("Performing sanitisation during speech processing")
                     
                     else:
                         logger.debug("Message does not contain 'chat_response'.")
@@ -701,11 +691,15 @@ class BaseSpeechReceiverModule(ALModule):
             logger.error("Error processing speech response:", e)
             if not is_chunk:
                 self.finish_speech_processing()
+
+    def finish_speech_processing(self):
+        """Helper method to finish speech processing"""
+        if hasattr(self, '_current_speech_processing_id'):
+            self.memory.raiseEvent("StopSpeaking", self._current_speech_processing_id)
+            delattr(self, '_current_speech_processing_id')
+
     def _strip_brace_segments(self, text):
         # Remove any { ... } segments (and leading whitespace before them), then collapse extra spaces
         cleaned = re.sub(r'\s*\{[^}]*\}', '', text)
         cleaned = re.sub(r' +', ' ', cleaned).strip()
         return cleaned
-        cleaned = re.sub(r' +', ' ', cleaned).strip()
-        return cleaned
-

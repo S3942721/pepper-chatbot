@@ -74,7 +74,7 @@ class BehaviourExecutor(ALModule):
         finally:
             logger.info("cleaned up!")
 
-    def sanitize_behaviour_requests(self, chat_response):
+    def sanitise_behaviour_requests(self, chat_response):
         keyword_to_behaviour = {}
         behaviour_triggered = [False]
 
@@ -91,9 +91,9 @@ class BehaviourExecutor(ALModule):
                     return match.group(0)
             return "^{}({})".format(match.group(1), keyword_to_behaviour[keyword])
 
-        sanitized_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, chat_response)
+        sanitised_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, chat_response)
         spoken_response = re.sub(r'\^(start|wait|stop|run)\([^\)]*\)', '', chat_response).strip()
-        return sanitized_response, behaviour_triggered[0], spoken_response
+        return sanitised_response, behaviour_triggered[0], spoken_response
 
     def on_eye_colour_hold(self, _, value):
         self.set_eye_colour(value)
@@ -147,27 +147,27 @@ class BehaviourExecutor(ALModule):
             logger.warning("No sound found for key:", sound_key)
         return
 
-    def sanitize_sound_requests(self, chat_response, play_sound=True):
+    def sanitise_sound_requests(self, chat_response, play_sound=True):
         def replace_keyword(match):
             keyword = match.group(1)
             if play_sound:
                 self.play_sound(keyword)
             return ''
 
-        sanitized_response = re.sub(r'\*\*audio=(.*?)\*\*', replace_keyword, chat_response)
-        return sanitized_response
+        sanitised_response = re.sub(r'\*\*audio=(.*?)\*\*', replace_keyword, chat_response)
+        return sanitised_response
 
-    def sanitize_request(self, chat_response):
+    def sanitise_request(self, chat_response):
         logger.info("Received chat response:", chat_response)
         
-        sanitized_response, behaviour_triggered, spoken_response = self.sanitize_behaviour_requests(chat_response)
-        sanitized_response = self.sanitize_sound_requests(sanitized_response)
-        spoken_response = self.sanitize_sound_requests(spoken_response, play_sound=False)
+        sanitised_response, behaviour_triggered, spoken_response = self.sanitise_behaviour_requests(chat_response)
+        sanitised_response = self.sanitise_sound_requests(sanitised_response)
+        spoken_response = self.sanitise_sound_requests(spoken_response, play_sound=False)
         spoken_response = self.response_string + spoken_response
-        sanitized_response = self.response_string + sanitized_response
-        logger.info("Sanitized response:", sanitized_response)
+        sanitised_response = self.response_string + sanitised_response
+        logger.info("sanitised response:", sanitised_response)
         logger.info("Spoken response:", spoken_response)
-        return sanitized_response, behaviour_triggered, spoken_response
+        return sanitised_response, behaviour_triggered, spoken_response
 
     def execute_behaviour(self, behaviour_key):
         behaviour = next((b for b in self.behaviours if b['behaviour_key'] == behaviour_key), None)
