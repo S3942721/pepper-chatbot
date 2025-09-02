@@ -8,8 +8,11 @@ import numpy as np
 import logger
 
 class SocketClient(threading.Thread):
-    def __init__(self, server_addr, server_port):
+    def __init__(self, name, nao_ip, nao_port, server_addr, server_port):
         super(SocketClient, self).__init__()
+        self.name = name
+        self.str_nao_ip = nao_ip
+        self.port = nao_port
         self.server_addr = server_addr
         self.server_port = server_port
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -20,7 +23,44 @@ class SocketClient(threading.Thread):
         # Audio streaming is now handled by AudioStreamModule via UDP
         self.speech_module = None  # Keep reference for compatibility
 
-        self.memory = ALProxy("ALMemory")
+        self.memory = ALProxy("ALMemory", self.str_nao_ip, self.port)
+
+        # Subscribe to Speaking events for status reporting
+        self.memory.subscribeToEvent("Speaking", self.name, "handle_speaking_event")
+
+        # Track speaking state
+        self.speaking_state = False
+
+    def on_speaking_state_change(self, event_name, is_speaking):
+        """Handle speaking state changes and report to server"""
+        is_speaking = bool(is_speaking)
+        self.speaking_state = is_speaking
+        
+        logger.info("Speaking state changed to:", is_speaking)
+        
+        # Send speaking state to server
+        self.send_speaking_state(is_speaking)
+
+    def send_speaking_state(self, speaking):
+        """Send speaking state update to server"""
+        if not self.connected:
+            return
+            
+        message = {
+            "cmd": "speaking-state",
+            "type": "speaking-state",
+            "robot": "Haku",
+            "message": {
+                "speaking": speaking
+            },
+            "timestamp": time.time()
+        }
+        
+        try:
+            self.client_socket.send(json.dumps(message).encode() + b'\n')
+            logger.debug("Sent speaking state to server:", speaking)
+        except Exception as e:
+            logger.error("Failed to send speaking state:", e)
 
     def set_speech_module(self, speech_module):
         """Keep method for compatibility but audio streaming now uses dedicated UDP module"""
@@ -40,7 +80,7 @@ class SocketClient(threading.Thread):
                 "robot": "Haku",
                 "timestamp": time.time()
             })
-            self.client_socket.send(identification_message.encode())
+            self.client_socket.send(identification_message.encode() + b'\n')
             logger.info("Sent robot identification:", identification_message)
 
         except socket.error as e:
