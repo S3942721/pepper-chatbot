@@ -8,6 +8,7 @@ from module_expressions import BehaviourExecutor
 from module_motion import MotionModule
 from module_exploration import ExploringModule
 from module_audiostream import AudioStreamModule
+from module_speaking_manager import SpeakingStateManager
 
 from naoqi import ALProxy, ALBroker
 import time
@@ -323,6 +324,12 @@ def main():
     memory.declareEvent("ControlWandering")
     memory.declareEvent("LockHead")
     memory.declareEvent("ControlAudioStreaming")
+    
+    # Speaking manager events
+    memory.declareEvent("StartSpeaking")
+    memory.declareEvent("StopSpeaking")
+    memory.declareEvent("QueueSpeech")
+    memory.declareEvent("DequeueResult")
 
     # turn off native pepper speech recognition
     asr = ALProxy("ALSpeechRecognition", ip, port)
@@ -330,6 +337,10 @@ def main():
     asr.setAudioExpression(False)   # disable beep noise when speech is detected
 
     speech_recoginition_url = os.getenv('SPEECH_RECOGINITION_URL') or server_url
+
+    # Initialize speaking state manager first (before other modules that depend on Speaking events)
+    global SpeakingManager
+    SpeakingManager = SpeakingStateManager("SpeakingManager")
 
     # Initialize speech recognition module with proper audio configuration
     global SpeechRecognition
@@ -387,13 +398,13 @@ def main():
         audio_stream_url, toint(audio_stream_port)
     )
 
-    socket_client = SocketClient(
+    global SocketClient
+    SocketClient = SocketClient(
         "SocketClient", ip, port,
         socket_url, toint(socket_port)
     )
     # Connect speech recognition module to socket client for audio streaming
-    socket_client.set_speech_module(SpeechRecognition)
-    socket_client.start()
+    SocketClient.start()
 
     # memory.raiseEvent("Say", "**audio=quickbells**")
     # memory.raiseEvent("Say", "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red ^wait(you) \\\\pau=1000\\\\")
@@ -417,18 +428,19 @@ def main():
         logger.info("")
         logger.info("Interrupted by user, shutting down gracefully...")
         
-        # Stop socket client first
-        try:
-            logger.info("Stopping socket client...")
-            socket_client.running = False
-            socket_client.join(timeout=2)
-        except:
-            pass
-        
+        # # Stop socket client first
+        # try:
+        #     logger.info("Stopping socket client...")
+        #     SocketClient.stop()
+        # except:
+        #     pass
+
         # Clean up modules by removing references and letting __del__ handle cleanup
         try:
             logger.info("Cleaning up modules...")
             # Remove global references to trigger __del__ methods
+            if 'SocketClient' in globals():
+                del SocketClient
             if 'AudioStream' in globals():
                 del AudioStream
             if 'SpeechRecognition' in globals():
@@ -447,6 +459,8 @@ def main():
                 del Exploration
             if 'HealthyCheck' in globals():
                 del HealthyCheck
+            if 'SpeakingManager' in globals():
+                del SpeakingManager
         except Exception as e:
             logger.error("Error during module cleanup:", e)
         

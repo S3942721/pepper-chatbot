@@ -56,7 +56,9 @@ class HealthyCheckModule(ALModule):
         if not value: self.memory.raiseEvent("Listening", False)
 
     def update_speaking(self, event_name, value):
+        # Receive speaking state updates from centralized speaking manager
         self.is_speaking = value
+        logger.debug("Healthy check received speaking state:", value)
 
     def update_chat_history(self, event_name, value):
         self.chat_history = value

@@ -1,37 +1,70 @@
 import socket
 import json
 import threading
-from naoqi import ALProxy
+from naoqi import ALProxy, ALModule
 import time
 import struct
 import numpy as np
 import logger
 
-class SocketClient(threading.Thread):
+class SocketClient(ALModule):
     def __init__(self, name, nao_ip, nao_port, server_addr, server_port):
-        super(SocketClient, self).__init__()
-        self.name = name
-        self.str_nao_ip = nao_ip
-        self.port = nao_port
+        ALModule.__init__(self, name)
+        self.BIND_PYTHON(self.getName(), "callback")
+        
+        self.memory = ALProxy("ALMemory")
+        # Subscribe to Speaking events for status reporting
+        self.memory.subscribeToEvent("Speaking", self.getName(), "on_speaking_event")
+        
         self.server_addr = server_addr
         self.server_port = server_port
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connected = False
         self.running = True
         
-        # Remove audio streaming from socket client - now handled by dedicated UDP module
-        # Audio streaming is now handled by AudioStreamModule via UDP
-        self.speech_module = None  # Keep reference for compatibility
-
-        self.memory = ALProxy("ALMemory", self.str_nao_ip, self.port)
-
-        # Subscribe to Speaking events for status reporting
-        self.memory.subscribeToEvent("Speaking", self.name, "handle_speaking_event")
-
+        # Thread for socket communication
+        self.socket_thread = None
+        
         # Track speaking state
         self.speaking_state = False
 
-    def on_speaking_state_change(self, event_name, is_speaking):
+    def __del__(self):
+        """Enhanced destructor that handles all cleanup gracefully"""
+        logger.info("cleaning everything")
+        
+        try:
+            # Stop the socket thread
+            self.running = False
+            
+            # Close socket connection
+            if hasattr(self, 'client_socket'):
+                try:
+                    if self.connected:
+                        self.client_socket.sendall('SHUTDOWN'.encode('utf-8'))
+                    self.client_socket.close()
+                except:
+                    pass
+            
+            # Wait for socket thread to finish
+            if hasattr(self, 'socket_thread') and self.socket_thread and self.socket_thread.is_alive():
+                try:
+                    self.socket_thread.join(timeout=2)
+                except:
+                    pass
+            
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribeToEvent("Speaking", self.getName())
+                except Exception as e:
+                    logger.warning("Could not unsubscribe from socket events:", e)
+                    
+        except Exception as e:
+            logger.error("Error during SocketClient cleanup:", e)
+        finally:
+            logger.info("cleaned up!")
+
+    def on_speaking_event(self, event_name, is_speaking):
         """Handle speaking state changes and report to server"""
         is_speaking = bool(is_speaking)
         self.speaking_state = is_speaking
@@ -44,6 +77,7 @@ class SocketClient(threading.Thread):
     def send_speaking_state(self, speaking):
         """Send speaking state update to server"""
         if not self.connected:
+            logger.warning("Not connected to server, cannot send speaking state")
             return
             
         message = {
@@ -58,14 +92,10 @@ class SocketClient(threading.Thread):
         
         try:
             self.client_socket.send(json.dumps(message).encode() + b'\n')
-            logger.debug("Sent speaking state to server:", speaking)
+            logger.info("Sent speaking state to server:", speaking)
+            logger.debug("Message content:", message)
         except Exception as e:
             logger.error("Failed to send speaking state:", e)
-
-    def set_speech_module(self, speech_module):
-        """Keep method for compatibility but audio streaming now uses dedicated UDP module"""
-        self.speech_module = speech_module
-        logger.info("Speech module reference set in socket client")
 
     def connection(self):
         try:
@@ -88,6 +118,14 @@ class SocketClient(threading.Thread):
             self.client_socket.close()
             self.connected = False
 
+    def start(self):
+        """Start the socket client thread"""
+        if not self.socket_thread or not self.socket_thread.is_alive():
+            self.running = True
+            self.socket_thread = threading.Thread(target=self.run)
+            self.socket_thread.daemon = True
+            self.socket_thread.start()
+            logger.info("Socket client started")
 
     def run(self):
         buffer = ""
@@ -117,8 +155,10 @@ class SocketClient(threading.Thread):
                 logger.error("Socket error:", e)
                 self.connected = False
                 self.client_socket.close()
-        if self.running:
-            self.run()
+                # Continue loop to attempt reconnection
+            except Exception as e:
+                logger.error("Unexpected error in socket run loop:", e)
+                break
 
     def process_message(self, json_data):
         logger.info("Received message:", json_data)
@@ -175,9 +215,36 @@ class SocketClient(threading.Thread):
         except Exception as e:
             logger.error("Processing message error", e)
 
-    def join(self, timeout=None):
-        self.running = False
-        self.client_socket.sendall('SHUTDOWN'.encode('utf-8'))
-        self.client_socket.close()
-        logger.info("Connection closed")
-        super(SocketClient, self).join(timeout)
+    def stop(self):
+        """Stop the socket client and clean up resources"""
+        try:
+            self.running = False
+            
+            # Close socket connection
+            if hasattr(self, 'client_socket'):
+                try:
+                    if self.connected:
+                        self.client_socket.sendall('SHUTDOWN'.encode('utf-8'))
+                    self.client_socket.close()
+                    self.connected = False
+                except:
+                    pass
+            
+            # Wait for socket thread to finish
+            if hasattr(self, 'socket_thread') and self.socket_thread and self.socket_thread.is_alive():
+                try:
+                    self.socket_thread.join(timeout=2)
+                except:
+                    pass
+            
+            # Unsubscribe from events
+            try:
+                if hasattr(self, 'memory'):
+                    self.memory.unsubscribeToEvent("Speaking", self.getName())
+            except Exception as e:
+                logger.warning("Could not unsubscribe from socket events:", e)
+                
+        except Exception as e:
+            logger.error("Error during SocketClient stop:", e)
+        finally:
+            logger.info("stopped!")

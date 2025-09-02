@@ -188,24 +188,8 @@ class BaseSpeechReceiverModule(ALModule):
         self.is_currently_speaking = False
         self.speech_finished_event.set()
 
-        # Only mark global Speaking as False if there are no pending queued messages.
-        # If there are queued messages we want to keep Speaking=True so audio streaming
-        # remains paused between consecutive speech items.
-        try:
-            with self.queue_lock:
-                queue_empty = self.message_queue.empty()
-        except Exception:
-            # If queue isn't available for any reason, fall back to clearing speaking
-            queue_empty = True
-
-        if queue_empty:
-            # Ensure other modules know speaking ended (so audio streaming resumes consistently)
-            self.memory.raiseEvent("Speaking", False)
-            logger.debug("Speaking False raised (no queued messages)")
-        else:
-            # Keep Speaking True while queued items remain; worker will handle next item.
-            logger.debug("Speaking remains True", self.message_queue.qsize(), "queued - keeping audio paused")
-            # Don't raise Speaking False event - keep audio stream paused
+        # Don't raise Speaking events directly - let speaking manager handle it
+        logger.debug("Speech finished, letting speaking manager handle Speaking state")
 
     def stop_speech(self, _, value):
         logger.debug("Stop speech event received")
@@ -262,8 +246,9 @@ class BaseSpeechReceiverModule(ALModule):
         self.reset_message()
         self.conversation_ongoing = False
         self.memory.raiseEvent("ConversationOngoing", False)
-        logger.debug("Speaking False called in clear_all")
-        self.memory.raiseEvent("Speaking", False)
+        
+        # Stop speaking via speaking manager instead of direct Speaking event
+        self.memory.raiseEvent("StopSpeaking", None)
         self.memory.raiseEvent("RunningBehaviour", False)
 
     def reset_message(self):
@@ -391,6 +376,9 @@ class BaseSpeechReceiverModule(ALModule):
             
             logger.debug("Processing queued message - Signal:", signal_name, "Speech ID:", speech_id, "Is Chunk:", is_chunk)
             
+            # Notify speaking manager about queue activity
+            self.memory.raiseEvent("DequeueResult", {"speech_id": speech_id, "is_chunk": is_chunk})
+            
             # Handle chunked responses
             if is_chunk and speech_id:
                 # If this is a new speech session or different from current
@@ -419,8 +407,9 @@ class BaseSpeechReceiverModule(ALModule):
                 with self.queue_lock:
                     queue_empty_after_processing = self.message_queue.empty()
                 if queue_empty_after_processing and not self.is_currently_speaking:
-                    logger.debug("Queue empty after processing, ensuring Speaking False")
-                    self.memory.raiseEvent("Speaking", False)
+                    logger.debug("Queue empty after processing, notifying speaking manager")
+                    # Let speaking manager determine if Speaking should be False
+                    # Don't directly raise Speaking False here
             except Exception:
                 pass
                 
@@ -536,6 +525,10 @@ class BaseSpeechReceiverModule(ALModule):
             "timestamp": time.time()
         }
         
+        # Notify speaking manager about queue activity
+        if is_chunk:
+            self.memory.raiseEvent("QueueSpeech", {"speech_id": speech_id, "is_chunk": is_chunk})
+        
         # Add to queue
         try:
             self.message_queue.put(message_item, timeout=1)
@@ -567,9 +560,13 @@ class BaseSpeechReceiverModule(ALModule):
         
         # Handle regular speech recognition from microphone
         if signalName == "SpeechRecognition":
-            # Set speaking state for speech recognition processing
-            self.memory.raiseEvent("Speaking", True)
-            logger.debug("Speaking True set for speech recognition processing")
+            # Generate speech ID for this recognition session
+            self.speech_counter += 1
+            speech_id = "speech_{}".format(self.speech_counter)
+            
+            # Notify speaking manager we're starting to speak
+            self.memory.raiseEvent("StartSpeaking", speech_id)
+            logger.debug("Notified speaking manager to start speaking")
             
             # Add user message to conversation
             self.messages.append({'role':'user','content':message})
@@ -592,11 +589,13 @@ class BaseSpeechReceiverModule(ALModule):
                     self.process_speech_response(resp_text, is_chunk=False)
                 else:
                     logger.debug("No response from chat completion API")
-                    self.memory.raiseEvent("Speaking", False)
+                    # Stop speaking via speaking manager instead of direct Speaking event
+                    self.memory.raiseEvent("StopSpeaking", speech_id)
                     
             except Exception as e:
                 logger.error("Chat completion API error:", e)
-                self.memory.raiseEvent("Speaking", False)
+                # Stop speaking via speaking manager instead of direct Speaking event
+                self.memory.raiseEvent("StopSpeaking", speech_id)
 
     def _strip_brace_segments(self, text):
         # Remove any { ... } segments (and leading whitespace before them), then collapse extra spaces
@@ -672,11 +671,15 @@ class BaseSpeechReceiverModule(ALModule):
                 # Only set Speaking True if not already speaking (to avoid audio stream toggle)
                 if not self.is_currently_speaking:
                     self.is_currently_speaking = True
-                    try:
-                        self.memory.raiseEvent("Speaking", True)
-                        logger.debug("Speaking True set for speech response")
-                    except Exception:
-                        pass
+                    
+                    # Generate speech ID if not provided
+                    if not hasattr(self, '_current_speech_processing_id'):
+                        self.speech_counter += 1
+                        self._current_speech_processing_id = "speech_{}".format(self.speech_counter)
+                    
+                    # Notify speaking manager
+                    self.memory.raiseEvent("StartSpeaking", self._current_speech_processing_id)
+                    logger.debug("Notified speaking manager to start speaking")
                 else:
                     logger.debug("Already speaking, not toggling Speaking event")
 

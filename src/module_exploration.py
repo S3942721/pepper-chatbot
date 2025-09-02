@@ -85,6 +85,7 @@ class ExploringModule(ALModule):
 
     def handle_speaking_event(self, event_name, value):
         logger.info("handle_speaking_event called with value:", value)
+        # Get speaking state from centralized speaking manager
         self.speaking = value
         if value:
             self.stop_exploring()
@@ -143,6 +144,7 @@ class ExploringModule(ALModule):
         # Send move to 0,0,0 to stop the robot
         self.motion_service.move(0.0, 0.0, 0.0)
         if exploring:
+            logger.info("Stopped exploring")
             self.posture_service.goToPosture("StandInit", self.FRACTION_MAX_SPEED)
 
         if hasattr(self, 'head_lock_stop_event'):
