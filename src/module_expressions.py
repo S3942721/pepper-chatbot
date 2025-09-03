@@ -157,14 +157,18 @@ class BehaviourExecutor(ALModule):
         sanitised_response = re.sub(r'\*\*audio=(.*?)\*\*', replace_keyword, chat_response)
         return sanitised_response
 
-    def sanitise_request(self, chat_response):
+    def sanitise_request(self, chat_response, add_speed_controls=True):
         logger.info("Received chat response:", chat_response)
         
         sanitised_response, behaviour_triggered, spoken_response = self.sanitise_behaviour_requests(chat_response)
         sanitised_response = self.sanitise_sound_requests(sanitised_response)
         spoken_response = self.sanitise_sound_requests(spoken_response, play_sound=False)
-        spoken_response = self.response_string + spoken_response
-        sanitised_response = self.response_string + sanitised_response
+        
+        # Only add response speed/wait controls if explicitly requested
+        if add_speed_controls:
+            spoken_response = self.response_string + spoken_response
+            sanitised_response = self.response_string + sanitised_response
+        
         logger.info("sanitised response:", sanitised_response)
         logger.info("Spoken response:", spoken_response)
         return sanitised_response, behaviour_triggered, spoken_response

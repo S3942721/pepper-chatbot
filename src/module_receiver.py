@@ -329,10 +329,10 @@ class BaseSpeechReceiverModule(ALModule):
             logger.debug("No text content found in message. Ignoring.")
             return
 
-        # Pre-sanitise the text if expressions module is available
+        # Pre-sanitise the text if expressions module is available (WITHOUT speed controls)
         if self.expressions:
             try:
-                sanitised_text, behaviour_triggered, spoken_response = self.expressions.sanitise_request(message_text)
+                sanitised_text, behaviour_triggered, spoken_response = self.expressions.sanitise_request(message_text, add_speed_controls=False)
                 logger.debug("Pre-sanitised message from", message_text, "to", sanitised_text)
                 message_text = sanitised_text
             except Exception as e:
@@ -412,6 +412,15 @@ class BaseSpeechReceiverModule(ALModule):
     def process_text_message(self, message_text, speech_id):
         """Process a text message for speech output"""
         try:
+            # Apply final sanitization with speed controls to the complete message
+            if self.expressions:
+                try:
+                    final_sanitised_text, behaviour_triggered, spoken_response = self.expressions.sanitise_request(message_text, add_speed_controls=True)
+                    logger.debug("Final sanitisation with speed controls applied")
+                    message_text = final_sanitised_text
+                except Exception as e:
+                    logger.warning("Failed to apply final sanitisation:", e, "using original text")
+
             # Check if early speaking finish is enabled and if this message has a trailing ^run
             if self.early_speaking_finish and speech_id:
                 # Check if there are any pending messages in the queue (this should be the last one)
