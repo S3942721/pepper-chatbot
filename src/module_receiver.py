@@ -337,6 +337,55 @@ class BaseSpeechReceiverModule(ALModule):
             except Exception as e:
                 logger.warning("Failed to pre-sanitise message:", e, "using original text")
 
+        # Check for message aggregation opportunity
+        with self.queue_lock:
+            queue_size = self.message_queue.qsize()
+            
+            # If there are 2 or more messages in queue, aggregate with the last message
+            if queue_size >= 2:
+                # Convert queue to list to access items
+                queue_items = []
+                
+                # Extract all items from queue safely
+                while not self.message_queue.empty():
+                    try:
+                        item = self.message_queue.get_nowait()
+                        self.message_queue.task_done()  # Mark as done since we're removing it
+                        queue_items.append(item)
+                    except Queue.Empty:
+                        break
+                
+                # Aggregate with the last item (most recent in queue)
+                if queue_items:
+                    last_item = queue_items[-1]
+                    
+                    # Check if the last message needs punctuation
+                    last_text = last_item["message_text"].strip()
+                    needs_punctuation = last_text and not last_text.endswith(('.', '!', '?', ';', ':'))
+                    
+                    # Combine the message text with proper punctuation
+                    if needs_punctuation:
+                        combined_text = last_item["message_text"] + ". " + message_text
+                    else:
+                        combined_text = last_item["message_text"] + " " + message_text
+                    
+                    last_item["message_text"] = combined_text
+                    logger.info("Aggregated message: '{}' + '{}' -> '{}'".format(
+                        last_text, 
+                        message_text, 
+                        combined_text
+                    ))
+                
+                # Put all items back in queue
+                for item in queue_items:
+                    self.message_queue.put(item)
+                
+                # Don't add the new message as it's been aggregated
+                # Don't notify speaking manager since we didn't add a new message
+                logger.debug("Message aggregated, not adding to queue")
+                return
+
+        # No aggregation - proceed with normal message queuing
         # Generate unique speech ID
         self.speech_counter += 1
         speech_id = "speech_{}".format(self.speech_counter)
@@ -406,7 +455,7 @@ class BaseSpeechReceiverModule(ALModule):
     def clear_message_queue(self):
         """Clear all pending messages from the queue"""
         with self.queue_lock:
-            # Clear the queue
+            # Clear the queue and mark all tasks as done
             while not self.message_queue.empty():
                 try:
                     self.message_queue.get_nowait()
