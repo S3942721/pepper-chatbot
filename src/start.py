@@ -348,6 +348,8 @@ def main():
     global SpeakingManager
     SpeakingManager = SpeakingStateManager("SpeakingManager")
 
+    logger.info("Initialising core modules with pre-cached proxies...")
+
     # Initialize speech recognition module with proper audio configuration
     global SpeechRecognition
     SpeechRecognition = SpeechRecognitionModule(

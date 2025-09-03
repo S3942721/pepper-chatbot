@@ -50,6 +50,17 @@ class BaseSpeechReceiverModule(ALModule):
         self.speech = ALProxy('ALAnimatedSpeech')
         self.led_service = ALProxy('ALLeds')
         self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
+        
+        # Pre-create and cache proxy instances to avoid thread spawning during stop operations
+        try:
+            self.tts_proxy = ALProxy("ALTextToSpeech", self.strNaoIp, self.port)
+            self.audio_player_proxy = ALProxy("ALAudioPlayer", self.strNaoIp, self.port)
+            logger.debug("Pre-created TTS and AudioPlayer proxies")
+        except Exception as e:
+            logger.warning("Could not pre-create some proxy instances:", e)
+            self.tts_proxy = None
+            self.audio_player_proxy = None
+        
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
         self.memory.subscribeToEvent("StopSpeech", self.getName(), "stop_speech")
         self.memory.subscribeToEvent("StopAction", self.getName(), "stop_all")
@@ -119,17 +130,31 @@ class BaseSpeechReceiverModule(ALModule):
         threading.Thread(target=self._stop_speech, args=(_, value)).start()
 
     def _stop_speech(self, _, value):
-        tts = ALProxy("ALTextToSpeech")
-        tts.stopAll()
+        try:
+            if self.tts_proxy:
+                self.tts_proxy.stopAll()
+            else:
+                # Fallback to creating proxy if pre-creation failed
+                tts = ALProxy("ALTextToSpeech")
+                tts.stopAll()
+        except Exception as e:
+            logger.warning("Error stopping TTS:", e)
 
     def stop_audio(self, _, value):
         logger.debug("Stop audio event received")
         threading.Thread(target=self._stop_audio, args=(_, value)).start()
 
     def _stop_audio(self, _, value):
-        self.memory.raiseEvent("RunningBehaviour", False)
-        audio_player = ALProxy("ALAudioPlayer")
-        audio_player.stopAll()
+        try:
+            self.memory.raiseEvent("RunningBehaviour", False)
+            if self.audio_player_proxy:
+                self.audio_player_proxy.stopAll()
+            else:
+                # Fallback to creating proxy if pre-creation failed
+                audio_player = ALProxy("ALAudioPlayer")
+                audio_player.stopAll()
+        except Exception as e:
+            logger.warning("Error stopping audio:", e)
 
     def stop_all(self, _, value):
         """Stop current speech/behaviours and CLEAR all pending queued messages."""
@@ -246,10 +271,13 @@ class BaseSpeechReceiverModule(ALModule):
         """Stop current speech without triggering global StopAction (preserve queue)."""
         try:
             if self.is_currently_speaking:
-                # Stop animated speech / tts directly
+                # Stop animated speech / tts directly using cached proxies
                 try:
-                    tts = ALProxy("ALTextToSpeech")
-                    tts.stopAll()
+                    if self.tts_proxy:
+                        self.tts_proxy.stopAll()
+                    else:
+                        tts = ALProxy("ALTextToSpeech")
+                        tts.stopAll()
                 except Exception:
                     pass
                 try:

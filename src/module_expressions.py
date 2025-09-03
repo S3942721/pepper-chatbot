@@ -44,6 +44,18 @@ class BehaviourExecutor(ALModule):
         
         self.led_service = ALProxy('ALLeds')
         
+        # Pre-create and cache proxy instances to avoid thread spawning during stop operations
+        try:
+            self.behavior_manager_proxy = ALProxy("ALBehaviorManager", self.nao_ip, self.nao_port)
+            self.animation_player_proxy = ALProxy("ALAnimationPlayer", self.nao_ip, self.nao_port)
+            self.audio_player_proxy = ALProxy("ALAudioPlayer", self.nao_ip, self.nao_port)
+            logger.debug("Pre-created behavior management proxies")
+        except Exception as e:
+            logger.warning("Could not pre-create some proxy instances:", e)
+            self.behavior_manager_proxy = None
+            self.animation_player_proxy = None
+            self.audio_player_proxy = None
+        
         with open(self.behaviours_file, 'r') as file:
             self.behaviours = json.load(file)
         
@@ -54,10 +66,14 @@ class BehaviourExecutor(ALModule):
         """Handle StopBehaviour events to stop all behaviors"""
         logger.info("StopBehaviour received - stopping all behaviors")
         try:
-            # Stop any running behaviors
+            # Stop any running behaviors using cached proxy
             self.memory.raiseEvent("RunningBehaviour", False)
-            bhv_manager = ALProxy("ALBehaviorManager")
-            bhv_manager.stopAllBehaviors()
+            if self.behavior_manager_proxy:
+                self.behavior_manager_proxy.stopAllBehaviors()
+            else:
+                # Fallback to creating proxy if pre-creation failed
+                bhv_manager = ALProxy("ALBehaviorManager")
+                bhv_manager.stopAllBehaviors()
         except Exception as e:
             logger.error("Error stopping behaviors:", e)
 
@@ -152,8 +168,12 @@ class BehaviourExecutor(ALModule):
             logger.info("Playing sound:", selected_sound)
             
             try:
-                audio_player_service = ALProxy("ALAudioPlayer", self.nao_ip, self.nao_port)
-                audio_player_service.playFile(str(selected_sound), 1.0, 0.0)
+                if self.audio_player_proxy:
+                    self.audio_player_proxy.playFile(str(selected_sound), 1.0, 0.0)
+                else:
+                    # Fallback to creating proxy if pre-creation failed
+                    audio_player_service = ALProxy("ALAudioPlayer", self.nao_ip, self.nao_port)
+                    audio_player_service.playFile(str(selected_sound), 1.0, 0.0)
                 return selected_sound
             except Exception as e:
                 logger.error("Error playing sound:", e)
@@ -197,8 +217,12 @@ class BehaviourExecutor(ALModule):
                 selected_behaviour = str(selected_behaviour)
 
             try:
-                animation_player_service = ALProxy("ALAnimationPlayer", self.nao_ip, self.nao_port)
-                animation_player_service.run(selected_behaviour, _async=True)
+                if self.animation_player_proxy:
+                    self.animation_player_proxy.run(selected_behaviour, _async=True)
+                else:
+                    # Fallback to creating proxy if pre-creation failed
+                    animation_player_service = ALProxy("ALAnimationPlayer", self.nao_ip, self.nao_port)
+                    animation_player_service.run(selected_behaviour, _async=True)
                 return selected_behaviour
             except Exception as e:
                 logger.error("Error executing behaviour:", e)
