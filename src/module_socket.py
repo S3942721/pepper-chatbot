@@ -5,6 +5,7 @@ from naoqi import ALProxy, ALModule
 import time
 import struct
 import numpy as np
+import re
 import logger
 
 class SocketClient(ALModule):
@@ -160,14 +161,55 @@ class SocketClient(ALModule):
                 logger.error("Unexpected error in socket run loop:", e)
                 break
 
+    def process_special_events(self, message_text):
+        """
+        Process special event syntax in messages (e.g., $StopAction=None)
+        Returns True if special events were processed, False otherwise
+        """
+        # Pattern to match $EventName=Value syntax
+        event_pattern = r'\$([A-Za-z][A-Za-z0-9_]*)\s*=\s*([^$\s]*)'
+        
+        matches = re.findall(event_pattern, message_text)
+        
+        if not matches:
+            return False
+        
+        logger.info("Processing special events from message:", message_text)
+        
+        for event_name, event_value in matches:
+            try:
+                # Convert event value to appropriate type
+                if event_value.lower() == 'none':
+                    value = None
+                elif event_value.lower() == 'true':
+                    value = True
+                elif event_value.lower() == 'false':
+                    value = False
+                elif event_value.isdigit():
+                    value = int(event_value)
+                elif '.' in event_value and event_value.replace('.', '').isdigit():
+                    value = float(event_value)
+                else:
+                    value = event_value
+                
+                logger.info("Executing special event:", event_name, "with value:", value)
+                self.memory.raiseEvent(event_name, value)
+                
+            except Exception as e:
+                logger.error("Error processing special event", event_name, ":", e)
+        
+        return True
+
     def process_message(self, json_data):
         logger.info("Received message:", json_data)
         try:
             if json_data['type'] == 'script':
                 msg = str(json_data['message'])
                 if msg:
-                    # self.memory.raiseEvent('StopAction', None) # TODO: revisit how to cancel existing actions before running a new item
-                    self.memory.raiseEvent('Say', msg)
+                    # Check for special events first
+                    if not self.process_special_events(msg):
+                        # self.memory.raiseEvent('StopAction', None) # TODO: revisit how to cancel existing actions before running a new item
+                        self.memory.raiseEvent('Say', msg)
             elif json_data['type'] == 'conversation-response':
                 msg = str(json_data['message'])
                 if msg:
@@ -186,8 +228,11 @@ class SocketClient(ALModule):
                         self.memory.raiseEvent(signal, value)
             elif json_data['type'] == 'shortcut':
                 if json_data['message']:
-                    # self.memory.raiseEvent('StopAction', None) # TODO: revisit how to cancel existing actions before running a new item
-                    self.memory.raiseEvent('Say', str(json_data['message']))
+                    msg = str(json_data['message'])
+                    # Check for special events first
+                    if not self.process_special_events(msg):
+                        # self.memory.raiseEvent('StopAction', None) # TODO: revisit how to cancel existing actions before running a new item
+                        self.memory.raiseEvent('Say', msg)
             elif json_data['type'] == 'trigger-all':
                 for item in json_data['message']:
                     if 'Signal' in item and 'Value' in item:

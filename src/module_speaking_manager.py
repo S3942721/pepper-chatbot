@@ -15,12 +15,6 @@ class SpeakingStateManager(ALModule):
         
         self.memory = ALProxy("ALMemory")
         
-        # Declare events that this module will manage
-        # self.memory.declareEvent("StartSpeaking")
-        # self.memory.declareEvent("StopSpeaking") 
-        # self.memory.declareEvent("QueueSpeech")
-        # self.memory.declareEvent("DequeueResult")
-        
         # Central speaking state
         self._speaking = False
         self._speaking_lock = threading.Lock()
@@ -34,6 +28,8 @@ class SpeakingStateManager(ALModule):
         self.memory.subscribeToEvent("StopSpeaking", self.getName(), "on_stop_speaking")
         self.memory.subscribeToEvent("QueueSpeech", self.getName(), "on_queue_speech")
         self.memory.subscribeToEvent("DequeueResult", self.getName(), "on_dequeue_result")
+        self.memory.subscribeToEvent("StopAction", self.getName(), "on_clear_queue")
+        self.memory.subscribeToEvent("ClearQueue", self.getName(), "on_clear_queue")
         self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "on_speech_finished")
         
         logger.info("SpeakingStateManager initialized")
@@ -123,6 +119,16 @@ class SpeakingStateManager(ALModule):
                 if was_speaking:
                     self.memory.raiseEvent("Speaking", False)
                     logger.info("Speech finished and queue empty, Speaking state changed to False")
+
+    def on_clear_queue(self, event_name, value):
+        """Handle clearing of the speech queue"""
+        with self._speaking_lock:
+            self._pending_speech_count = 0
+            logger.info("Speech queue cleared, pending count reset to 0")
+            # If not currently speaking, ensure Speaking is False
+            if not self._speaking:
+                self.memory.raiseEvent("Speaking", False)
+                logger.info("Not speaking after queue clear, ensuring Speaking False")
 
     def get_speaking_state(self):
         """Get current speaking state (thread-safe)"""

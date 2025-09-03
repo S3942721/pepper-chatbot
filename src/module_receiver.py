@@ -53,7 +53,6 @@ class BaseSpeechReceiverModule(ALModule):
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
         self.memory.subscribeToEvent("StopSpeech", self.getName(), "stop_speech")
         self.memory.subscribeToEvent("StopAction", self.getName(), "stop_all")
-        self.memory.subscribeToEvent("StopBehaviour", self.getName(), "stop_behaviour")
         self.memory.subscribeToEvent("StopAudio", self.getName(), "stop_audio")
         self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "finished_speaking")
 
@@ -95,7 +94,6 @@ class BaseSpeechReceiverModule(ALModule):
                     self.memory.unsubscribe('Speaking', self.getName())
                     self.memory.unsubscribe('StopAction', self.getName())
                     self.memory.unsubscribe('StopSpeech', self.getName())
-                    self.memory.unsubscribe('StopBehaviour', self.getName())
                     self.memory.unsubscribe('StopAudio', self.getName())
                     self.memory.unsubscribe('ALAnimatedSpeech/EndOfAnimatedSpeech', self.getName())
                 except Exception as e:
@@ -124,15 +122,6 @@ class BaseSpeechReceiverModule(ALModule):
         tts = ALProxy("ALTextToSpeech")
         tts.stopAll()
 
-    def stop_behaviour(self, _, value):
-        logger.debug("Stop behaviour event received")
-        threading.Thread(target=self._stop_behaviour, args=(_, value)).start()
-
-    def _stop_behaviour(self, _, value):
-        self.memory.raiseEvent("RunningBehaviour", False)
-        bhv_manager = ALProxy("ALBehaviorManager")
-        bhv_manager.stopAllBehaviors()
-
     def stop_audio(self, _, value):
         logger.debug("Stop audio event received")
         threading.Thread(target=self._stop_audio, args=(_, value)).start()
@@ -143,17 +132,23 @@ class BaseSpeechReceiverModule(ALModule):
         audio_player.stopAll()
 
     def stop_all(self, _, value):
-        """Stop current speech/behaviours but do NOT clear pending queued messages."""
-        logger.debug("Stop all event received - stopping speech and behaviours (queue preserved)")
+        """Stop current speech/behaviours and CLEAR all pending queued messages."""
+        logger.info("Stop all event received - stopping speech, behaviours, and clearing queue")
 
-        # Stop current speech only (allow pending queued messages to be processed)
+        # Clear the entire message queue first
+        self.clear_message_queue()
+
+        # Stop current speech
         self.stop_current_speech()
 
-        # Original stop all functionality (stop display/behaviours/audio)
-        self.finished_speaking(_, value)
-        self.stop_speech(_, value)
-        self.stop_behaviour(_, value)
+        # Stop any playing audio
         self.stop_audio(_, value)
+
+        # Original stop all functionality (stop display/behaviours/audio)
+        # self.finished_speaking(_, value)  # Deprecated
+        # self.stop_speech(_, value)        # Deprecated
+        
+        logger.info("Stop all completed - queue cleared and all actions stopped")
 
     def start( self ):
         self.memory.subscribeToEvent("Say", self.getName(), "processRemote")
@@ -519,5 +514,8 @@ class BaseSpeechReceiverModule(ALModule):
                     self.message_queue.task_done()
                 except Queue.Empty:
                     break
+
+            # Notify speaking manager that queue is cleared
+            self.memory.raiseEvent("ClearQueue", True)
 
             logger.debug("Message queue cleared")

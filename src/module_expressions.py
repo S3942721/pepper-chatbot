@@ -39,6 +39,8 @@ class BehaviourExecutor(ALModule):
         self.memory.subscribeToEvent("ControlContextMovement", name, "on_control_tracking_mode")
         self.memory.subscribeToEvent("ControlEngagement", name, "on_control_engagement_mode")
         self.memory.subscribeToEvent("ControlAwareness", name, "on_control_basic_awareness")
+        self.memory.subscribeToEvent("StopAction", name, "stop_behaviour")
+        self.memory.subscribeToEvent("StopBehaviour", name, "stop_behaviour")
         
         self.led_service = ALProxy('ALLeds')
         
@@ -47,6 +49,17 @@ class BehaviourExecutor(ALModule):
         
         with open(self.sounds_file, 'r') as file:
             self.sounds = json.load(file)
+
+    def stop_behaviour(self, event_name, value):
+        """Handle StopBehaviour events to stop all behaviors"""
+        logger.info("StopBehaviour received - stopping all behaviors")
+        try:
+            # Stop any running behaviors
+            self.memory.raiseEvent("RunningBehaviour", False)
+            bhv_manager = ALProxy("ALBehaviorManager")
+            bhv_manager.stopAllBehaviors()
+        except Exception as e:
+            logger.error("Error stopping behaviors:", e)
 
     def __del__(self):
         """Enhanced destructor that handles all cleanup gracefully"""
@@ -66,6 +79,7 @@ class BehaviourExecutor(ALModule):
                     self.memory.unsubscribe("ControlContextMovement", self.getName())
                     self.memory.unsubscribe("ControlEngagement", self.getName())
                     self.memory.unsubscribe("ControlAwareness", self.getName())
+                    self.memory.unsubscribe("StopAction", self.getName())
             except Exception as e:
                 logger.warning("Could not unsubscribe from expression events:", e)
                 
@@ -278,6 +292,8 @@ class BehaviourExecutor(ALModule):
                     self.memory.unsubscribe("ControlContextMovement", self.getName())
                     self.memory.unsubscribe("ControlEngagement", self.getName())
                     self.memory.unsubscribe("ControlAwareness", self.getName())
+                    self.memory.unsubscribe("StopAction", self.getName())
+                    self.memory.unsubscribe("StopBehaviour", self.getName())
             except Exception as e:
                 logger.warning("Could not unsubscribe from expression events:", e)
                 
