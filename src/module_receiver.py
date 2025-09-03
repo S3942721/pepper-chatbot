@@ -18,7 +18,7 @@ class BaseSpeechReceiverModule(ALModule):
             self, strModuleName, strNaoIp, port, 
             server_url=None, base_route=None, api_key=None, 
             model_name=None, save_csv=False, system_prompt='', behaviours_file='behaviours_described.json', sounds_file='sounds_described.json',
-            expressions=None
+            expressions=None, early_speaking_finish=True
         ):
         
         ALModule.__init__(self, strModuleName )
@@ -34,6 +34,7 @@ class BaseSpeechReceiverModule(ALModule):
         self.strNaoIp = strNaoIp
         
         self.expressions = expressions
+        self.early_speaking_finish = early_speaking_finish
 
         # Message queue system initialisation
         self.message_queue = Queue.Queue()
@@ -411,6 +412,16 @@ class BaseSpeechReceiverModule(ALModule):
     def process_text_message(self, message_text, speech_id):
         """Process a text message for speech output"""
         try:
+            # Check if early speaking finish is enabled and if this message has a trailing ^run
+            if self.early_speaking_finish and speech_id:
+                # Check if there are any pending messages in the queue (this should be the last one)
+                with self.queue_lock:
+                    queue_empty = self.message_queue.empty()
+                
+                if queue_empty:
+                    # This is the final message, check for trailing ^run behavior
+                    message_text = self.add_early_speaking_finish(message_text, speech_id)
+
             # Strip brace segments (e.g. { ... }) from what will be spoken
             cleaned_text = self._strip_brace_segments(message_text)
             
@@ -441,10 +452,47 @@ class BaseSpeechReceiverModule(ALModule):
             # Ensure we notify speaking manager on error
             if speech_id:
                 self.memory.raiseEvent("StopSpeaking", speech_id)
-                pass
+
+    def add_early_speaking_finish(self, message_text, speech_id):
+        """Add $StopSpeaking event before trailing ^run(...) behaviors"""
+        try:
+            # Pattern to match trailing ^run(...) at the end of the message
+            # This regex looks for ^run(...) that appears at the end, possibly followed by whitespace and braces
+            import re
+            
+            # Match ^run(...) followed only by optional whitespace and brace segments
+            trailing_run_pattern = r'(\^run\([^)]+\))(\s*\{[^}]*\})*\s*$'
+            
+            match = re.search(trailing_run_pattern, message_text)
+            
+            if match:
+                # Found a trailing ^run behavior
+                run_behavior = match.group(0)  # The entire matched trailing section
                 
+                # Find the position where the trailing ^run starts
+                run_start = match.start()
+                
+                # Split the message into before and after the trailing ^run
+                before_run = message_text[:run_start]
+                
+                # Insert $StopSpeaking event before the trailing ^run
+                stop_speaking_event = "$StopSpeaking={}".format(speech_id)
+                
+                # Reconstruct the message with the event inserted
+                modified_message = before_run + " " + stop_speaking_event + " " + run_behavior
+                
+                logger.info("Added early speaking finish event before trailing ^run behavior")
+                logger.debug("Original:", message_text)
+                logger.debug("Modified:", modified_message)
+                
+                return modified_message
+            
+            # No trailing ^run found, return original message
+            return message_text
+            
         except Exception as e:
-            logger.error("Error processing queued message:", e)
+            logger.error("Error adding early speaking finish:", e)
+            return message_text
 
     def _strip_brace_segments(self, text):
         """Remove any { ... } segments (and leading whitespace before them), then collapse extra spaces"""

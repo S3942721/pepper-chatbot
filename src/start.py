@@ -126,6 +126,11 @@ def main():
         dest="filter_qitype",
         action="store_false",
         default=True)
+    parser.add_option("--early-speaking-finish",
+        help="Enable early speaking finish detection for trailing behaviors (default: True)",
+        dest="early_speaking_finish",
+        action="store_false",
+        default=True)
     parser.set_defaults(
         volume=DEFAULT_VOLUME,
         ip=NAO_IP,
@@ -178,6 +183,7 @@ def main():
     log_level_str = opts.log_level.upper()
     log_filter = opts.log_filter
     filter_qitype = opts.filter_qitype
+    early_speaking_finish = opts.early_speaking_finish
 
     # Configure logging with specified level and filters
     log_level_map = {
@@ -371,7 +377,8 @@ def main():
         "Receiver", ip, port,
         server_url=server_url, base_route=chat_route,
         api_key=api_key, model_name=model_name, save_csv=save_csv,
-        system_prompt=prompt, expressions=Expressions
+        system_prompt=prompt, expressions=Expressions, 
+        early_speaking_finish=early_speaking_finish
     )
     Receiver.start()
     
