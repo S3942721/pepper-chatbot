@@ -415,10 +415,6 @@ def main():
     # Connect speech recognition module to socket client for audio streaming
     SocketClient.start()
 
-    # memory.raiseEvent("Say", "**audio=quickbells**")
-    # memory.raiseEvent("Say", "Goodbye everyone, and just remember ^start(you) $EyeColour=red $Sound=ill_be_back $EyeColour=red ^wait(you) \\\\pau=1000\\\\")
-    # memory.raiseEvent("Say", "^run(helicopter) $EyeColour=red $Sound=get_to_the_choppa $EyeColour=red")
-
     # Load the default HTML for logo
     memory.raiseEvent("LoadHTML", webview)
     # memory.raiseEvent("LoadHTML", "http://198.18.0.1/apps/rmit-race/event-agenda-ltq.html")
