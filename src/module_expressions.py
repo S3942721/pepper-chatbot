@@ -21,7 +21,7 @@ class BehaviourExecutor(ALModule):
         self.response_speed = self.DEFAULT_RESPONSE_SPEED
         self.response_speed_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
         
-        self.DEFAULT_SENTENCE_PAUSE_DURATION = 5
+        self.DEFAULT_SENTENCE_PAUSE_DURATION = 2
         self.sentence_pause_duration = self.DEFAULT_SENTENCE_PAUSE_DURATION
         self.sentence_pause_string = "\\\\wait=" + str(self.sentence_pause_duration) + "\\\\"
         
