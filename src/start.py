@@ -45,7 +45,7 @@ MODEL_NAME = os.getenv('MODEL_NAME')
 API_KEY = os.getenv('API_KEY')
 SPEECH_API_KEY = os.getenv('SPEECH_API_KEY') or API_KEY
 
-WEBVIEW = os.getenv('WEBVIEW') or "http://198.18.0.1/apps/rmit-race/event-agenda-ltq.html"
+WEBVIEW = os.getenv('WEBVIEW') or "http://198.18.0.1:3000/tablet"
 
 def main():
     # Setup logger first with default level - will be reconfigured later
