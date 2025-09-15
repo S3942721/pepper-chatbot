@@ -23,7 +23,7 @@ class ExploringModule(ALModule):
         self.posture_service = ALProxy("ALRobotPosture")
         self.navigation_service = ALProxy("ALNavigation")
 
-        self.posture_service.goToPosture("StandInit", self.FRACTION_MAX_SPEED)
+        # self.posture_service.goToPosture("StandInit", self.FRACTION_MAX_SPEED)
 
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking_event")
         self.memory.subscribeToEvent("ControlWandering", self.getName(), "on_control_wandering")
@@ -145,7 +145,7 @@ class ExploringModule(ALModule):
         self.motion_service.move(0.0, 0.0, 0.0)
         if exploring:
             logger.info("Stopped exploring")
-            self.posture_service.goToPosture("StandInit", self.FRACTION_MAX_SPEED)
+            self.posture_service.goToPosture("Stand", self.FRACTION_MAX_SPEED)
 
         if hasattr(self, 'head_lock_stop_event'):
             self.head_lock_stop_event.set()
