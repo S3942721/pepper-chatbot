@@ -1,6 +1,7 @@
 import qi
 import inspect
 import os
+import sys
 
 # Define log levels from qi.logging for convenience
 FATAL = qi.logging.FATAL
@@ -62,16 +63,16 @@ def _get_category():
     Returns only the filename without line number for consistent qi.logging context.
     """
     try:
-        stack = inspect.stack()
-        # stack[0] is _get_category, stack[1] is the log function, stack[2] is the caller.
-        for frame_record in stack[2:]:
-            # Find the first frame outside of this logger module
-            if frame_record[1] != __file__:
-                filename = os.path.basename(frame_record[1])
-                # Python 2.7 compatible string formatting - return only filename
-                return filename
+        # Use sys._getframe instead of inspect.stack() for Python 2.7 compatibility
+        frame = sys._getframe(2)  # Go up 2 frames to get the actual caller
+        while frame:
+            filename = frame.f_code.co_filename
+            if filename != __file__:
+                return os.path.basename(filename)
+            frame = frame.f_back
         return "unknown"
-    except IndexError:
+    except (AttributeError, ValueError):
+        # Fallback if _getframe is not available or fails
         return "unknown"
 
 def _get_line_number():
@@ -79,53 +80,118 @@ def _get_line_number():
     Inspects the call stack to find the line number of the caller.
     """
     try:
-        stack = inspect.stack()
-        # stack[0] is _get_line_number, stack[1] is _format_message, stack[2] is the log function, stack[3] is the caller.
-        for frame_record in stack[3:]:
-            # Find the first frame outside of this logger module
-            if frame_record[1] != __file__:
-                lineno = frame_record[2]
-                return lineno
+        # Use sys._getframe instead of inspect.stack() for Python 2.7 compatibility
+        frame = sys._getframe(3)  # Go up 3 frames to get the actual caller
+        while frame:
+            filename = frame.f_code.co_filename
+            if filename != __file__:
+                return frame.f_lineno
+            frame = frame.f_back
         return 0
-    except IndexError:
+    except (AttributeError, ValueError):
+        # Fallback if _getframe is not available or fails
         return 0
 
-def _format_message(msg):
+def _format_message(msg, *args):
     """
-    Format message with line number in bold at the start.
+    Format message with arguments and line number.
     """
-    line_number = _get_line_number()
-    
-    # Add bold line number at start of message
-    formatted_msg = "\033[1m[%d]\033[0m %s" % (line_number, msg)
-
-    return formatted_msg
+    try:
+        line_number = _get_line_number()
+        # Format the message with arguments first
+        if args:
+            formatted_msg = msg % args
+        else:
+            formatted_msg = str(msg)
+        # Add bold line number at start of message
+        final_msg = "\033[1m[%d]\033[0m %s" % (line_number, formatted_msg)
+        return final_msg
+    except Exception:
+        # Fallback to simple formatting if anything goes wrong
+        if args:
+            return str(msg % args)
+        else:
+            return str(msg)
 
 def fatal(msg, *args):
     """Logs a message with level FATAL."""
-    qi.logging.fatal(_get_category(), _format_message(msg), *args)
+    try:
+        formatted_msg = _format_message(msg, *args)
+        qi.logging.fatal(_get_category(), formatted_msg)
+    except Exception:
+        # Fallback to simple print if qi.logging fails
+        try:
+            fallback_msg = msg % args if args else str(msg)
+        except:
+            fallback_msg = str(msg) + " " + " ".join(str(arg) for arg in args)
+        print("FATAL [%s]: %s" % (_get_category(), fallback_msg))
 
 def error(msg, *args):
     """Logs a message with level ERROR."""
-    qi.logging.error(_get_category(), _format_message(msg), *args)
+    try:
+        formatted_msg = _format_message(msg, *args)
+        qi.logging.error(_get_category(), formatted_msg)
+    except Exception:
+        # Fallback to simple print if qi.logging fails
+        try:
+            fallback_msg = msg % args if args else str(msg)
+        except:
+            fallback_msg = str(msg) + " " + " ".join(str(arg) for arg in args)
+        print("ERROR [%s]: %s" % (_get_category(), fallback_msg))
 
 def warning(msg, *args):
     """Logs a message with level WARNING."""
-    qi.logging.warning(_get_category(), _format_message(msg), *args)
+    try:
+        formatted_msg = _format_message(msg, *args)
+        qi.logging.warning(_get_category(), formatted_msg)
+    except Exception:
+        # Fallback to simple print if qi.logging fails
+        try:
+            fallback_msg = msg % args if args else str(msg)
+        except:
+            fallback_msg = str(msg) + " " + " ".join(str(arg) for arg in args)
+        print("WARNING [%s]: %s" % (_get_category(), fallback_msg))
 
 def info(msg, *args):
     """Logs a message with level INFO."""
-    qi.logging.info(_get_category(), _format_message(msg), *args)
+    try:
+        formatted_msg = _format_message(msg, *args)
+        qi.logging.info(_get_category(), formatted_msg)
+    except Exception:
+        # Fallback to simple print if qi.logging fails
+        try:
+            fallback_msg = msg % args if args else str(msg)
+        except:
+            fallback_msg = str(msg) + " " + " ".join(str(arg) for arg in args)
+        print("INFO [%s]: %s" % (_get_category(), fallback_msg))
 
 def verbose(msg, *args):
     """Logs a message with level VERBOSE - most detailed level, shows when level is VERBOSE only."""
     # Only log if current level is exactly VERBOSE (most detailed)
     if _current_log_level == VERBOSE:
-        qi.logging.verbose(_get_category(), _format_message(msg), *args)
+        try:
+            formatted_msg = _format_message(msg, *args)
+            qi.logging.verbose(_get_category(), formatted_msg)
+        except Exception:
+            # Fallback to simple print if qi.logging fails
+            try:
+                fallback_msg = msg % args if args else str(msg)
+            except:
+                fallback_msg = str(msg) + " " + " ".join(str(arg) for arg in args)
+            print("VERBOSE [%s]: %s" % (_get_category(), fallback_msg))
 
 def debug(msg, *args):
     """Logs a message with level DEBUG - shows when level is DEBUG or higher (but not VERBOSE)."""
     # Only log if current level is DEBUG or higher, but NOT VERBOSE
     if _current_log_level >= DEBUG and _current_log_level != VERBOSE:
-        # Map debug to qi.logging.verbose since qi doesn't have debug level
-        qi.logging.verbose(_get_category(), _format_message(msg), *args)
+        try:
+            formatted_msg = _format_message(msg, *args)
+            # Map debug to qi.logging.verbose since qi doesn't have debug level
+            qi.logging.verbose(_get_category(), formatted_msg)
+        except Exception:
+            # Fallback to simple print if qi.logging fails
+            try:
+                fallback_msg = msg % args if args else str(msg)
+            except:
+                fallback_msg = str(msg) + " " + " ".join(str(arg) for arg in args)
+            print("DEBUG [%s]: %s" % (_get_category(), fallback_msg))

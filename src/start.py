@@ -9,6 +9,7 @@ from module_motion import MotionModule
 from module_exploration import ExploringModule
 from module_audiostream import AudioStreamModule
 from module_speaking_manager import SpeakingStateManager
+from module_awareness import AwarenessModule
 
 from naoqi import ALProxy, ALBroker
 import time
@@ -36,7 +37,8 @@ DEFAULT_SOCKET_PORT = os.getenv('DEFAULT_SOCKET_PORT') or '3456'
 DEFAULT_AUDIO_STREAM_URL = os.getenv('DEFAULT_AUDIO_STREAM_URL') or '192.168.1.101'
 DEFAULT_AUDIO_STREAM_PORT = os.getenv('DEFAULT_AUDIO_STREAM_PORT') or '5004'
 DEFAULT_WEB_CONTROLLER_URL = os.getenv('DEFAULT_WEB_CONTROLLER_URL') or None
-DEFAULT_LOG_LEVEL = os.getenv('DEFAULT_LOG_LEVEL') or 'INFO'
+DEFAULT_WAKE_ON_START = os.getenv('DEFAULT_WAKE_ON_START') or "True"
+DEFAULT_REST_ON_EXIT = os.getenv('DEFAULT_REST_ON_EXIT') or "False"
 
 # openai
 MODEL_NAME = os.getenv('MODEL_NAME')
@@ -131,6 +133,12 @@ def main():
         dest="early_speaking_finish",
         action="store_false",
         default=True)
+    parser.add_option("--wake-on-start",
+        help="Wake robot on startup (default: True)",
+        dest="wake_on_start")
+    parser.add_option("--rest-on-exit",
+        help="Put robot to rest on program exit (default: False)",
+        dest="rest_on_exit")
     parser.set_defaults(
         volume=DEFAULT_VOLUME,
         ip=NAO_IP,
@@ -155,7 +163,9 @@ def main():
         web_controller_url=DEFAULT_WEB_CONTROLLER_URL,
         log_level="INFO",
         log_filter="",
-        filter_qitype=True
+        filter_qitype=True,
+        wake_on_start=DEFAULT_WAKE_ON_START,
+        rest_on_exit=DEFAULT_REST_ON_EXIT
     )
 
     opts = parser.parse_args()[0]
@@ -184,6 +194,8 @@ def main():
     log_filter = opts.log_filter
     filter_qitype = opts.filter_qitype
     early_speaking_finish = opts.early_speaking_finish
+    wake_on_start = opts.wake_on_start == "True"  # Convert string to boolean
+    rest_on_exit = opts.rest_on_exit == "True"    # Convert string to boolean
 
     # Configure logging with specified level and filters
     log_level_map = {
@@ -331,6 +343,12 @@ def main():
     memory.declareEvent("LockHead")
     memory.declareEvent("ControlAudioStreaming")
     
+    # Robot awareness events
+    memory.declareEvent("ControlRobotWake")
+    memory.declareEvent("ControlRobotRest")
+    memory.declareEvent("GetRobotAwarenessStatus")
+    memory.declareEvent("RobotAwarenessState")
+    
     # Speaking manager events
     memory.declareEvent("StartSpeaking")
     memory.declareEvent("StopSpeaking")
@@ -400,6 +418,10 @@ def main():
     global Exploration
     Exploration = ExploringModule("Exploration")    
 
+    # Initialize Robot Awareness Module with configuration options
+    global RobotAwareness
+    RobotAwareness = AwarenessModule("RobotAwareness", ip, port, wake_on_start, rest_on_exit)
+
     # Initialize GStreamer audio streaming module with resolved URLs
     global AudioStream
     AudioStream = AudioStreamModule(
@@ -466,6 +488,8 @@ def main():
                 del HealthyCheck
             if 'SpeakingManager' in globals():
                 del SpeakingManager
+            if 'RobotAwareness' in globals():
+                del RobotAwareness
         except Exception as e:
             logger.error("Error during module cleanup:", e)
         
