@@ -1,3 +1,8 @@
+import os
+import sys
+import time
+import subprocess
+import logger
 from module_receiver import BaseSpeechReceiverModule
 from module_speechrecognition import SpeechRecognitionModule
 from module_eyecontact import EyeContactModule
@@ -12,13 +17,9 @@ from module_speaking_manager import SpeakingStateManager
 from module_awareness import AwarenessModule
 
 from naoqi import ALProxy, ALBroker
-import time
-import os
-import sys
 
 from optparse import OptionParser
 from tools import load_env, toint, tofloat
-import logger
 
 load_env()
 
@@ -250,6 +251,46 @@ def main():
             audio_stream_url = web_controller_url
             logger.info("Audio stream URL set from web controller:", audio_stream_url)
 
+    # Configure Pepper tablet proxy target if webview is enabled
+    def _extract_host(value):
+        try:
+            v = str(value or '').strip()
+            if not v:
+                return None
+            if '://' not in v:
+                v = 'http://' + v
+            
+            # Manual parsing without urlparse
+            try:
+                after_scheme = v.split('://', 1)[1]
+                hostport = after_scheme.split('/', 1)[0]
+                host = hostport.split(':', 1)[0]
+                return host or None
+            except Exception:
+                return None
+        except Exception:
+            return None
+
+    
+    proxy_target_host = None
+    if webview:
+        # Prefer web_controller_url host, then socket_url, then audio_stream_url
+        proxy_target_host = _extract_host(web_controller_url) or _extract_host(socket_url) or _extract_host(audio_stream_url)
+        # Avoid setting to Pepper's own proxy IP or localhost
+        if proxy_target_host in [None, '198.18.0.1', '127.0.0.1', 'localhost']:
+            proxy_target_host = None
+        
+        if proxy_target_host:
+            try:
+                logger.info("Setting tablet proxy target host to:", proxy_target_host)
+                rc = subprocess.call(['pepper-proxy-ctl', 'set-target', proxy_target_host])
+                if rc == 0:
+                    logger.info("pepper-proxy-ctl set-target succeeded")
+                else:
+                    logger.warning("pepper-proxy-ctl returned non-zero exit code:", rc)
+            except OSError as e:
+                logger.warning("pepper-proxy-ctl not available or failed to execute:", e)
+
     # Display final configuration
     logger.info("Final configuration:")
     logger.info("  Socket URL: ", socket_url, ":", socket_port)
@@ -342,6 +383,8 @@ def main():
     memory.declareEvent("ControlWandering")
     memory.declareEvent("LockHead")
     memory.declareEvent("ControlAudioStreaming")
+    # Declare heartbeat event used by HealthyCheckModule
+    memory.declareEvent("WebviewHeartbeat")
     
     # Robot awareness events
     memory.declareEvent("ControlRobotWake")
@@ -410,7 +453,7 @@ def main():
 
     # if webview:
     global HealthyCheck
-    HealthyCheck = HealthyCheckModule("HealthyCheck", webview_url=webview)
+    HealthyCheck = HealthyCheckModule("HealthyCheck", nao_ip=ip, nao_port=port, webview_url=webview)
     
     global Motion
     Motion = MotionModule("Motion", ip, port)
