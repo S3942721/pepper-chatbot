@@ -448,8 +448,9 @@ def main():
     try:
         while True:
             time.sleep(1)
-            if webview:
-                HealthyCheck.ping()
+            # if webview:           # TODO: Find a way that works for checking if the tablet has gone away
+                # HealthyCheck.ping()
+                # logger.debug("TURNED OFF PING FOR WEBVIEW HEALTHY CHECK")
 
     except KeyboardInterrupt:
         logger.info("")
