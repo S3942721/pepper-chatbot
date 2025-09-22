@@ -125,10 +125,18 @@ class SpeakingStateManager(ALModule):
         with self._speaking_lock:
             self._pending_speech_count = 0
             logger.info("Speech queue cleared, pending count reset to 0")
-            # If not currently speaking, ensure Speaking is False
-            if not self._speaking:
-                self.memory.raiseEvent("Speaking", False)
-                logger.info("Not speaking after queue clear, ensuring Speaking False")
+            
+            # Always ensure Speaking is False when queue is cleared
+            was_speaking = self._speaking
+            self._speaking = False
+            self._current_speech_id = None
+            
+            # Always raise Speaking False event when queue is cleared to ensure consistency
+            self.memory.raiseEvent("Speaking", False)
+            if was_speaking:
+                logger.info("Speaking state changed to False after queue clear")
+            else:
+                logger.info("Speaking state confirmed False after queue clear")
 
     def get_speaking_state(self):
         """Get current speaking state (thread-safe)"""

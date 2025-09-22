@@ -97,6 +97,10 @@ class SocketClient(ALModule):
         """Handle speaking state changes and report to server"""
         is_speaking = bool(is_speaking)
         
+        # Always update our internal state first
+        old_speaking_state = self.speaking_state
+        self.speaking_state = is_speaking
+        
         # Check for state changes that require notification
         if self.was_speaking and not is_speaking:
             # Robot stopped speaking - immediately notify web controller
@@ -107,10 +111,12 @@ class SocketClient(ALModule):
             self.current_behavior = "speaking"
             logger.info("Robot started speaking - updating behavior to speaking")
         
-        self.speaking_state = is_speaking
+        # Update was_speaking after processing the change
         self.was_speaking = is_speaking
         
-        logger.info("Speaking state changed to:", is_speaking)
+        # Log state changes for debugging
+        if old_speaking_state != is_speaking:
+            logger.info("Speaking state changed from", old_speaking_state, "to", is_speaking)
         
         # Send speaking state to server
         self.send_speaking_state(is_speaking)
@@ -243,15 +249,19 @@ class SocketClient(ALModule):
             # Execute StopAction event to stop all activities
             self.memory.raiseEvent("StopAction", None)
             
-            # Update internal state immediately
+            # Update internal state immediately and ensure speaking is false
             self.speaking_state = False
+            self.was_speaking = False
             self.current_behavior = "idle"
             self.conversation_session_id = None
             
-            # Send state update to confirm the stop
+            # Send immediate speaking state update to ensure web controller knows we stopped
+            self.send_speaking_state(False)
+            
+            # Send comprehensive state update to confirm the stop
             self.send_state_update()
             
-            logger.info("$StopAction executed successfully")
+            logger.info("$StopAction executed successfully - speaking state reset to False")
             
         except Exception as e:
             logger.error("Error executing $StopAction:", e)
@@ -441,6 +451,13 @@ class SocketClient(ALModule):
                 logger.info("Executing special event:", event_name, "with value:", value)
                 self.memory.raiseEvent(event_name, value)
                 
+                # Special handling for StopAction to ensure speaking state is reset
+                if event_name == "StopAction":
+                    logger.info("StopAction special event - resetting speaking state immediately")
+                    self.speaking_state = False
+                    self.was_speaking = False
+                    self.current_behavior = "idle"
+                
             except Exception as e:
                 logger.error("Error processing special event", event_name, ":", e)
         
@@ -480,6 +497,12 @@ class SocketClient(ALModule):
                 logger.info("Processing control command:", cmd)
                 if cmd == '$StopAction':
                     self.handle_stop_action_command(json_data)
+                elif cmd == 'robot_wake':
+                    self.handle_robot_wake_command(json_data)
+                elif cmd == 'robot_rest':
+                    self.handle_robot_rest_command(json_data)
+                elif cmd == 'reload_tablet':
+                    self.memory.raiseEvent("ReloadTablet", True)
                 else:
                     logger.warning("Unknown control command:", cmd)
                 return

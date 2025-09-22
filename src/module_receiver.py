@@ -163,16 +163,15 @@ class BaseSpeechReceiverModule(ALModule):
         # Clear the entire message queue first
         self.clear_message_queue()
 
-        # Stop current speech
+        # Stop current speech and explicitly notify speaking manager
         self.stop_current_speech()
+        
+        # Explicitly notify speaking manager that we're stopping
+        self.memory.raiseEvent("StopSpeaking", None)
 
         # Stop any playing audio
         self.stop_audio(_, value)
 
-        # Original stop all functionality (stop display/behaviours/audio)
-        # self.finished_speaking(_, value)  # Deprecated
-        # self.stop_speech(_, value)        # Deprecated
-        
         logger.info("Stop all completed - queue cleared and all actions stopped")
 
     def start( self ):

@@ -46,7 +46,7 @@ MODEL_NAME = os.getenv('MODEL_NAME')
 API_KEY = os.getenv('API_KEY')
 SPEECH_API_KEY = os.getenv('SPEECH_API_KEY') or API_KEY
 
-WEBVIEW = os.getenv('WEBVIEW') or "http://198.18.0.1:3000/tablet"
+WEBVIEW = os.getenv('WEBVIEW') or "http://198.18.0.1:3000/tablet?robot=Haku"
 
 def main():
     # Setup logger first with default level - will be reconfigured later
@@ -383,7 +383,7 @@ def main():
     memory.declareEvent("ControlWandering")
     memory.declareEvent("LockHead")
     memory.declareEvent("ControlAudioStreaming")
-    # Declare heartbeat event used by HealthyCheckModule
+    memory.declareEvent("ReloadTablet")
     memory.declareEvent("WebviewHeartbeat")
     
     # Robot awareness events
