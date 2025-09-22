@@ -877,7 +877,7 @@
     }, 
     {
         "action_description": "looks to be thinking and scratches chin", 
-        "behaviour_key": "thinking", 
+        "behaviour_key": "thinking2", 
         "behaviour_variations": [
             "animations/Stand/Gestures/Thinking_2", 
             "animations/Stand/Gestures/Thinking_7", 
@@ -888,7 +888,25 @@
             "animations/Stand/Gestures/Thinking_5", 
             "animations/Stand/Gestures/Thinking_6"
         ]
-    }, 
+    },
+    {
+        "action_description": "looks to be thinking and scratching head", 
+        "behaviour_key": "thinking", 
+        "behaviour_variations": [
+            "animations/Stand/Gestures/Thinking_2", 
+            "animations/Stand/Gestures/Thinking_7", 
+            "animations/Stand/Gestures/Thinking_1", 
+            "animations/Stand/Gestures/Thinking_3", 
+            "animations/Stand/Gestures/Thinking_8", 
+            "animations/Stand/Gestures/Thinking_4", 
+            "animations/Stand/Gestures/Thinking_5", 
+            "animations/Stand/Gestures/Thinking_6",
+            "animations/Stand/Emotions/Neutral/Thoughtful_1",
+            "animations/Stand/Waiting/Think_3",
+            "animations/Stand/Waiting/Think_2", 
+            "animations/Stand/Waiting/Think_4"
+        ]
+    },
     {
         "action_description": "points to something infront of it", 
         "behaviour_key": "this", 
