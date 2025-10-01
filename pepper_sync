@@ -283,6 +283,107 @@ Host {HOST_NAME}
 #         print("✗ Connection test failed. Please check if the robot is online.")
 #         return False
 
+def setup_ssh_environment(target_address=None):
+    """Set up SSH environment for connecting to the Pepper robot."""
+    print("SSH Environment Setup for Pepper Robot")
+    print("=" * 40)
+    
+    # Get target address if not provided
+    if not target_address:
+        current_ip = get_current_config_ip()
+        if current_ip:
+            print(f"Current configured address: {current_ip}")
+            use_current = input("Use current address? (Y/n): ").strip().lower()
+            if use_current != 'n':
+                target_address = current_ip
+        
+        if not target_address:
+            while True:
+                target_address = input("Enter robot IP address or hostname: ").strip()
+                if validate_ip_or_hostname(target_address):
+                    break
+                print("Invalid IP address or hostname format. Please try again.")
+    
+    print(f"\nSetting up SSH for: {target_address}")
+    
+    # Step 1: Generate SSH key if it doesn't exist
+    print("\n1. Checking SSH key...")
+    if os.path.exists(SSH_KEY_FILE):
+        print(f"✓ SSH key already exists: {SSH_KEY_FILE}")
+        overwrite = input("Key exists. Generate new key? (y/N): ").strip().lower()
+        if overwrite != 'y':
+            print("Using existing key.")
+        else:
+            generate_new_key = True
+    else:
+        print(f"SSH key not found: {SSH_KEY_FILE}")
+        generate_new_key = True
+    
+    if 'generate_new_key' in locals() and generate_new_key:
+        print("Generating new SSH key...")
+        try:
+            # Create .ssh directory if it doesn't exist
+            ssh_dir = os.path.dirname(SSH_KEY_FILE)
+            os.makedirs(ssh_dir, exist_ok=True)
+            os.chmod(ssh_dir, 0o700)
+            
+            # Generate SSH key
+            run_command([
+                'ssh-keygen', '-t', 'ed25519', '-f', SSH_KEY_FILE, 
+                '-C', 'haku-key', '-N', ''
+            ], capture_output=False)
+            
+            # Set proper permissions
+            os.chmod(SSH_KEY_FILE, 0o600)
+            os.chmod(f"{SSH_KEY_FILE}.pub", 0o644)
+            
+            print(f"✓ SSH key generated: {SSH_KEY_FILE}")
+        except Exception as e:
+            print(f"✗ Failed to generate SSH key: {e}")
+            return False
+    
+    # Step 2: Copy SSH key to robot
+    print("\n2. Copying SSH key to robot...")
+    print("You may be prompted for the robot's password (default: nao)")
+    
+    pub_key_file = f"{SSH_KEY_FILE}.pub"
+    if not os.path.exists(pub_key_file):
+        print(f"✗ Public key not found: {pub_key_file}")
+        return False
+    
+    try:
+        # Use ssh-copy-id to copy the key
+        run_command([
+            'ssh-copy-id', '-i', pub_key_file,
+            '-o', 'PubkeyAcceptedAlgorithms=+ssh-rsa',
+            f'{REMOTE_USER}@{target_address}'
+        ], capture_output=False)
+        
+        print("✓ SSH key copied to robot")
+    except Exception as e:
+        print(f"✗ Failed to copy SSH key: {e}")
+        print("\nYou can manually copy the key with:")
+        print(f"ssh-copy-id -i {pub_key_file} -o PubkeyAcceptedAlgorithms=+ssh-rsa {REMOTE_USER}@{target_address}")
+        return False
+    
+    # Step 3: Update SSH config
+    print("\n3. Updating SSH configuration...")
+    update_ssh_config(target_address)
+    
+    # Step 4: Test connection
+    print("\n4. Testing connection...")
+    if test_connection(HOST_NAME):
+        print("\n✓ SSH setup completed successfully!")
+        print(f"You can now connect with: ssh {HOST_NAME}")
+        print(f"Or sync files with: ./haku_sync")
+        return True
+    else:
+        print("\n✗ Connection test failed. Please check:")
+        print("- Robot is powered on and connected to network")
+        print("- IP address/hostname is correct")
+        print("- Robot SSH service is running")
+        return False
+
 def test_connection(target):
     """Test SSH connection to the target."""
     print(f"Testing connection to {target}...")
@@ -393,6 +494,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  %(prog)s --setup                  # Set up SSH environment for first time use
+  %(prog)s --setup 192.168.1.50     # Set up SSH for specific IP
   %(prog)s                          # Sync to current SSH config
   %(prog)s 192.168.1.50             # Sync to specific IP
   %(prog)s --hostname               # Sync to haku.local
@@ -429,6 +532,8 @@ Examples:
                        help="Use direct IP instead of SSH config alias")
     parser.add_argument("--set-ip", action="store_true",
                        help="Set IP address in SSH config (interactive mode)")
+    parser.add_argument("--setup", action="store_true",
+                       help="Set up SSH environment (generate keys, copy to robot, configure SSH)")
     parser.add_argument("--use-scp", action="store_true",
                        help="Force use of scp instead of rsync for file transfer")
     
@@ -440,6 +545,14 @@ Examples:
             set_pepper_ip(args.ip)
         else:
             set_pepper_ip()
+        return
+    
+    # Handle --setup mode
+    if args.setup:
+        if args.ip:
+            setup_ssh_environment(args.ip)
+        else:
+            setup_ssh_environment()
         return
     
     # Validate that only one connection method is specified
