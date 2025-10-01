@@ -102,10 +102,14 @@ class SpeakingStateManager(ALModule):
                 if self._pending_speech_count == 0 and not self._speaking:
                     self.memory.raiseEvent("Speaking", False)
                     logger.info("Queue empty and not speaking, ensuring Speaking False")
+            else:
+                logger.warning("Received dequeue event but pending count was already 0")
 
     def on_speech_finished(self, event_name, value):
         """Handle end of animated speech"""
         with self._speaking_lock:
+            logger.info("Speech finished event received. Current state: speaking=", self._speaking, ", pending_count=", self._pending_speech_count)
+            
             # Check if there are pending messages in the queue
             if self._pending_speech_count > 0:
                 logger.info("Speech finished but", self._pending_speech_count, "messages pending, keeping Speaking True")
@@ -119,6 +123,8 @@ class SpeakingStateManager(ALModule):
                 if was_speaking:
                     self.memory.raiseEvent("Speaking", False)
                     logger.info("Speech finished and queue empty, Speaking state changed to False")
+                else:
+                    logger.debug("Speech finished, Speaking was already False")
 
     def on_clear_queue(self, event_name, value):
         """Handle clearing of the speech queue"""

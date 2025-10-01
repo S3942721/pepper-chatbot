@@ -46,8 +46,18 @@ class BaseSpeechReceiverModule(ALModule):
         # Speaking state management
         self.is_currently_speaking = False
         self.speech_finished_event = threading.Event()
+        self.speech_timeout_timer = None  # Add timeout timer
+        self.SPEECH_TIMEOUT = 30.0  # 30 second timeout for speech completion
 
         self.speech = ALProxy('ALAnimatedSpeech')
+        
+        # Test the speech service on initialization
+        try:
+            self.speech.getSupportedLanguages()
+            logger.info("ALAnimatedSpeech service test successful")
+        except Exception as e:
+            logger.error("ALAnimatedSpeech service test failed during initialization:", e)
+        
         self.led_service = ALProxy('ALLeds')
         self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
         
@@ -116,7 +126,13 @@ class BaseSpeechReceiverModule(ALModule):
             logger.info("cleaned up!")
 
     def finished_speaking(self, _, value):
-        logger.debug("Speech finished event received")
+        logger.info("Speech finished event received for value:", value)
+        
+        # Log the raw event details for debugging
+        logger.info("ALAnimatedSpeech/EndOfAnimatedSpeech event - Raw value:", repr(value))
+        
+        # Cancel the timeout timer
+        self.cancel_speech_timeout()
         
         # Signal that speech has finished
         self.is_currently_speaking = False
@@ -124,6 +140,11 @@ class BaseSpeechReceiverModule(ALModule):
 
         # Don't raise Speaking events directly - let speaking manager handle it
         logger.debug("Speech finished, letting speaking manager handle Speaking state")
+        
+        # Log queue status when speech finishes
+        with self.queue_lock:
+            queue_size = self.message_queue.qsize()
+            logger.info("Speech finished. Messages still in queue:", queue_size)
 
     def stop_speech(self, _, value):
         logger.debug("Stop speech event received")
@@ -229,11 +250,18 @@ class BaseSpeechReceiverModule(ALModule):
                 if message_item.get("type") == "STOP_WORKER":
                     break
                 
-                # Process the message
-                self.process_queued_message(message_item)
+                # Process the message with error handling
+                try:
+                    self.process_queued_message(message_item)
+                except Exception as e:
+                    logger.error("Error processing queued message:", e)
+                    # Ensure we mark task as done even if processing fails
                 
                 # Mark task as done
                 self.message_queue.task_done()
+                
+                # Log queue status after processing
+                logger.debug("Queue worker processed message, remaining queue size:", self.message_queue.qsize())
                 
             except Queue.Empty:
                 # Timeout occurred, continue loop
@@ -250,7 +278,7 @@ class BaseSpeechReceiverModule(ALModule):
             message_text = message_item["message_text"]
             speech_id = message_item["speech_id"]
             
-            logger.debug("Processing queued message - Signal:", signal_name, "Speech ID:", speech_id)
+            logger.info("Processing queued message - Signal:", signal_name, "Speech ID:", speech_id, "Queue remaining:", self.message_queue.qsize())
             
             # Notify speaking manager about queue activity
             self.memory.raiseEvent("DequeueResult", {"speech_id": speech_id})
@@ -265,6 +293,9 @@ class BaseSpeechReceiverModule(ALModule):
                 
         except Exception as e:
             logger.error("Error processing queued message:", e)
+            # Ensure speaking manager knows this speech failed
+            if 'speech_id' in locals():
+                self.memory.raiseEvent("StopSpeaking", speech_id)
 
     def stop_current_speech(self):
         """Stop current speech without triggering global StopAction (preserve queue)."""
@@ -431,9 +462,48 @@ class BaseSpeechReceiverModule(ALModule):
         except Queue.Full:
             logger.error("Message queue is full, dropping message")
 
+    def start_speech_timeout(self, speech_id):
+        """Start a timeout timer for speech completion"""
+        if self.speech_timeout_timer:
+            self.speech_timeout_timer.cancel()
+        
+        self.speech_timeout_timer = threading.Timer(self.SPEECH_TIMEOUT, self.on_speech_timeout, args=[speech_id])
+        self.speech_timeout_timer.start()
+        logger.debug("Started speech timeout timer for speech_id:", speech_id)
+
+    def cancel_speech_timeout(self):
+        """Cancel the speech timeout timer"""
+        if self.speech_timeout_timer:
+            self.speech_timeout_timer.cancel()
+            self.speech_timeout_timer = None
+            logger.debug("Cancelled speech timeout timer")
+
+    def on_speech_timeout(self, speech_id):
+        """Handle speech timeout - force completion"""
+        logger.error("Speech timeout occurred for speech_id:", speech_id)
+        logger.error("Forcing speech completion due to timeout")
+        
+        # Force speech completion
+        self.is_currently_speaking = False
+        self.speech_finished_event.set()
+        
+        # Try to stop any running speech
+        try:
+            if self.tts_proxy:
+                self.tts_proxy.stopAll()
+            self.speech.stopAll()
+        except Exception as e:
+            logger.error("Error stopping speech during timeout:", e)
+        
+        # Notify speaking manager
+        self.memory.raiseEvent("StopSpeaking", speech_id)
+        self.memory.raiseEvent("RunningBehaviour", False)
+
     def process_text_message(self, message_text, speech_id):
         """Process a text message for speech output"""
         try:
+            logger.info("Starting to process text message with speech_id:", speech_id)
+            
             # Apply final sanitization with speed controls to the complete message
             if self.expressions:
                 try:
@@ -458,6 +528,8 @@ class BaseSpeechReceiverModule(ALModule):
             
             if not cleaned_text.strip():
                 logger.debug("Response empty after cleaning. Skipping speech.")
+                # Notify speaking manager that this speech is complete
+                self.memory.raiseEvent("StopSpeaking", speech_id)
                 return
             
             logger.info("Speech Output:\n================================\n", cleaned_text, "\n================================\n")
@@ -468,21 +540,54 @@ class BaseSpeechReceiverModule(ALModule):
                 
                 # Notify speaking manager
                 self.memory.raiseEvent("StartSpeaking", speech_id)
-                logger.debug("Notified speaking manager to start speaking")
+                logger.info("Notified speaking manager to start speaking with speech_id:", speech_id)
             else:
                 logger.debug("Already speaking, not toggling Speaking event")
 
             # Set running behaviour flag
             self.memory.raiseEvent("RunningBehaviour", True)
 
-            # Execute the speech
-            self.speech.say(cleaned_text)
+            # Start speech timeout
+            self.start_speech_timeout(speech_id)
+
+            # Execute the speech with enhanced error handling and logging
+            try:
+                logger.info("Executing speech.say() with text:", repr(cleaned_text[:100]))
+                # Execute the speech
+                logger.info("About to call speech.say() - speech_id:", speech_id)
+                self.speech.say(cleaned_text)
+                logger.info("speech.say() call completed successfully for speech_id:", speech_id)
+                
+                # Log the fact that we're waiting for the EndOfAnimatedSpeech event
+                logger.info("Waiting for ALAnimatedSpeech/EndOfAnimatedSpeech event for speech_id:", speech_id)
+                
+            except Exception as speech_error:
+                logger.error("Error during speech.say() execution:", speech_error)
+                logger.error("Speech error details - Text length:", len(cleaned_text), "Speech ID:", speech_id)
+                
+                # Try to get more details about the error
+                try:
+                    import traceback
+                    logger.error("Speech error traceback:", traceback.format_exc())
+                except:
+                    pass
+                
+                # Cancel timeout and mark as not speaking
+                self.cancel_speech_timeout()
+                self.is_currently_speaking = False
+                self.memory.raiseEvent("StopSpeaking", speech_id)
+                self.memory.raiseEvent("RunningBehaviour", False)
+                raise speech_error
 
         except Exception as e:
             logger.error("Error processing text message:", e)
             # Ensure we notify speaking manager on error
             if speech_id:
                 self.memory.raiseEvent("StopSpeaking", speech_id)
+            # Reset local speaking state
+            self.is_currently_speaking = False
+            # Cancel timeout
+            self.cancel_speech_timeout()
 
     def add_early_speaking_finish(self, message_text, speech_id):
         """Add $StopSpeaking event before trailing ^run(...) behaviors"""
