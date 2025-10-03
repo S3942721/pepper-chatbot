@@ -22,6 +22,7 @@ from naoqi import ALModule, ALProxy
 from tools import audio_recoginze, buffer_to_wav_in_memory
 from numpy import sqrt, mean, square
 import traceback
+import logger
 
 
 RECORDING_DURATION = 12      # seconds, maximum recording time, also default value for startRecording(), Google Speech API only accepts up to about 10-15 seconds
@@ -67,13 +68,20 @@ class SpeechRecognitionModule(ALModule):
             self.is_speaking = False
             self.is_allowed_recording = True
 
+            # Audio streaming variables
+            self.audioStreamCallback = None
+            self.isStreamingEnabled = False
+            self.streamBuffer = []
+            self.maxStreamBufferSize = SAMPLE_RATE * 2  # 2 seconds of audio buffer
+
             self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
             self.memory.subscribeToEvent("EyeContact", self.getName(), "eye_contact_toggle")
             self.memory.subscribeToEvent("Speaking", self.getName(), "speaking_toggle")
             self.memory.subscribeToEvent("ControlRecording", self.getName(), "recording_toggle")
             self.memory.subscribeToEvent("ClearSpeechRecognitionBuffer", self.getName(), "clear_buffer")
             self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
-
+            # Remove ALMemory event subscriptions for audio streaming
+            
             # flag to indicate if we are currently recording audio
             self.isRecording = False
             self.startRecordingTimestamp = 0
@@ -108,18 +116,50 @@ class SpeechRecognitionModule(ALModule):
             asr.setAudioExpression(False)   # disable beep noise when speech is detected
 
         except BaseException as err:
-            print( "ERR: SpeechRecognitionModule: loading error: %s" % str(err) )
+            logger.error("loading error:", str(err))
 
     # __init__ - end
     def __del__( self ):
-        print( "INF: SpeechRecognitionModule.__del__: cleaning everything" )
-        self.stop()    
+        """Enhanced destructor that handles all cleanup gracefully"""
+        logger.info("cleaning everything")
+        
+        try:
+            # Stop audio processing if still active
+            if hasattr(self, 'isStarted') and self.isStarted:
+                try:
+                    if hasattr(self, 'strNaoIp') and hasattr(self, 'port'):
+                        audio = ALProxy("ALAudioDevice", self.strNaoIp, self.port)
+                        audio.unsubscribe(self.getName())
+                except Exception as e:
+                    logger.warning("Could not unsubscribe from audio device:", e)
+            
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribe("EyeContact", self.getName())
+                    self.memory.unsubscribe("Speaking", self.getName())
+                    self.memory.unsubscribe("ControlRecording", self.getName())
+                    self.memory.unsubscribe("ClearSpeechRecognitionBuffer", self.getName())
+                    self.memory.unsubscribe("ResetConversation", self.getName())
+                except Exception as e:
+                    logger.warning("Could not unsubscribe from speech recognition events:", e)
+            
+            # Clean up local state
+            if hasattr(self, 'isStarted'):
+                self.isStarted = False
+            if hasattr(self, 'isRecording'):
+                self.isRecording = False
+                
+        except Exception as e:
+            logger.error("Error during SpeechRecognitionModule cleanup:", e)
+        finally:
+            logger.info("cleaned up!")
 
     def start( self ):
         if(self.isStarted):
             return
 
-        # print("INF: SpeechRecognitionModule: starting!")
+        # logger.info("SpeechRecognitionModule: starting!")
 
         self.isStarted = True
 
@@ -143,11 +183,11 @@ class SpeechRecognitionModule(ALModule):
         audio = ALProxy("ALAudioDevice")
         audio.unsubscribe(self.getName())
 
-        # print("INF: SpeechRecognitionModule: stopped!")
+        logger.info("paused!")
 
     def stop( self ):
         self.pause()
-        print( "INF: SpeechRecognitionModule: stopped!" )
+        logger.info("stopped!")
 
     def eye_contact_toggle(self, _, has_eye_contact):
         self.eye_contact = has_eye_contact
@@ -161,18 +201,20 @@ class SpeechRecognitionModule(ALModule):
         if allowed_recording:
             audio = ALProxy( "ALAudioDevice")
             audio.setOutputVolume(self.volume)
-            print("INF: SpeechRecognitionModule: volume set to %s" % self.volume)
+            logger.info("volume set to", self.volume)
         else:
             audio = ALProxy( "ALAudioDevice")
             audio.setOutputVolume(0)
-            print("INF: SpeechRecognitionModule: volume set to 0")
+            logger.info("volume set to 0")
         
         self.is_allowed_recording = allowed_recording
         self.toggle_status()
         # self.memory.raiseEvent("ResetConversation", True)
 
     def toggle_status(self):
-        if self.eye_contact and not self.is_speaking and self.is_allowed_recording:
+        # TODO: Refactor for constant audio streaming without parsing pepper's speach to llm
+        # if self.eye_contact and not self.is_speaking and self.is_allowed_recording:
+        if self.is_allowed_recording:
             self.start()
         else:
             self.pause()
@@ -194,6 +236,36 @@ class SpeechRecognitionModule(ALModule):
 
             aSoundDataInterlaced = np.fromstring( str(buffer), dtype=np.int16 )
             aSoundData = np.reshape( aSoundDataInterlaced, (nbOfChannels, nbrOfSamplesByChannel), 'F' )
+
+            # Handle audio streaming with improved debugging
+            if self.isStreamingEnabled and self.audioStreamCallback:
+                # Use front microphone (channel 0) for streaming
+                audioData = aSoundData[0]
+                self.streamBuffer.extend(audioData)
+                
+                # Debug: Print buffer status occasionally
+                if len(self.streamBuffer) > 0 and len(self.streamBuffer) % 48000 == 0:
+                    logger.debug("Stream buffer size:", len(self.streamBuffer), "samples (", float(len(self.streamBuffer)) / SAMPLE_RATE, "seconds)")
+                
+                # Send buffer when it reaches a certain size (e.g., 0.1 seconds of audio)
+                chunkSize = int(SAMPLE_RATE * 0.1)  # 100ms chunks
+                while len(self.streamBuffer) >= chunkSize:
+                    chunk = self.streamBuffer[:chunkSize]
+                    self.streamBuffer = self.streamBuffer[chunkSize:]
+                    
+                    logger.debug("Sending audio chunk of", len(chunk), "samples to callback")
+                    
+                    # Call the callback with the audio chunk
+                    try:
+                        self.audioStreamCallback(chunk)
+                    except Exception as e:
+                        logger.error("Audio stream callback error:", str(e))
+                
+                # Prevent buffer from growing too large
+                if len(self.streamBuffer) > self.maxStreamBufferSize:
+                    self.streamBuffer = self.streamBuffer[-self.maxStreamBufferSize:]
+            elif self.isStreamingEnabled and not self.audioStreamCallback:
+                logger.debug("Streaming enabled but no callback set")
 
             # compute RMS, handle autodetection
             if( self.isAutoDetectionEnabled or self.isRecording):
@@ -221,7 +293,7 @@ class SpeechRecognitionModule(ALModule):
                 elif ((timestamp - self.startRecordingTimestamp) > self.recordingDuration):
                     self.memory.raiseEvent("Log", "Analysing what you said...")
                     self.memory.raiseEvent("Listening", False)
-                    print('Max recording duration hit')
+                    logger.info('Max recording duration hit')
                     # check how long we are recording
                     self.stopRecordingAndRecognize()
 
@@ -229,7 +301,7 @@ class SpeechRecognitionModule(ALModule):
                 # lastTimeRMSPeak is 0 if no peak occured
                 if (timestamp - self.lastTimeRMSPeak >= self.idleReleaseTime) and (
                         timestamp - self.startRecordingTimestamp >= self.holdTime):
-                    # print(('stopping after idle/hold time'))
+                    # logger.info(('stopping after idle/hold time'))
                     self.memory.raiseEvent("Log", "Analysing what you said...")
                     self.memory.raiseEvent("Listening", False)
                     self.stopRecordingAndRecognize()
@@ -250,7 +322,7 @@ class SpeechRecognitionModule(ALModule):
 
         except:
             # i did this so i could see the stracktrace as the thread otherwise just silently failed
-            traceback.print_exc()
+            logger.error(traceback.format_exc())
 
     # processRemote - end
 
@@ -260,9 +332,6 @@ class SpeechRecognitionModule(ALModule):
         #rms = 20 * np.log10(np.sqrt(np.sum(np.power(data, 2) / len(data))))
         return rms
 
-    def version( self ):
-        return "1.1"
-
     # use this method to manually start recording (works with both autodetection enabled or disabled)
     # the recording will stop after the signal is below the threshold for IDLE_RELEASE_TIME seconds,
     # but will at least record for HOLD_TIME seconds
@@ -271,7 +340,7 @@ class SpeechRecognitionModule(ALModule):
             return
 
         # if not self.inited:
-        #     print("INF: Started, you can speek now\n")
+        #     logger.info("Started, you can speek now\n")
         #     self.inited = True
 
         # start recording
@@ -287,10 +356,10 @@ class SpeechRecognitionModule(ALModule):
 
     def stopRecordingAndRecognize(self):
         if(self.isRecording == False):
-            # print("INF: SpeechRecognitionModule.stopRecordingAndRecognize: not recording")
+            # logger.info("SpeechRecognitionModule.stopRecordingAndRecognize: not recording")
             return
 
-        # print("INF: stopping recording and recognizing")
+        # logger.info("stopping recording and recognizing")
 
         # TODO: choose which mic channel to use
         # can we use the sound direction module for this?
@@ -374,7 +443,8 @@ class SpeechRecognitionModule(ALModule):
         result = audio_recoginze(self.stt_url, wav_file, self.stt_route, self.stt_api_key)
         if result:
             self.memory.raiseEvent("SpeechRecognition", result)
-            print('Speech Recognition Result:\n================================\n'+result+'\n================================\n')
+            logger.info('Speech Recognition Result:\n================================\n', result, '\n================================\n')
+            logger.info('Speech Recognition Result:\n================================\n%s\n================================\n', result)
 
     def setAutoDetectionThreshold(self, threshold):
         self.autoDetectionThreshold = threshold

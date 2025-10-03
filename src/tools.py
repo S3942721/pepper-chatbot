@@ -4,6 +4,7 @@ import json
 import io
 import wave
 import struct
+import logger
 
 def load_env(file_path = '.env'):
     try:
@@ -54,10 +55,10 @@ def request(base_url, route, body, headers = {}, is_json = True):
         return json.loads(response_data)
     
     except urllib2.HTTPError as e:
-        print("HTTP Error:", e.code, e.read())
+        logger.error("HTTP Error:", e.code, e.read())
 
     except urllib2.URLError as e:
-        print("URL Error:", e.reason)
+        logger.error("URL Error:", e.reason)
 
 
 def chat_completion(base_url, messages, max_tokens=0, route='/chat/completions', model_name=None, api_key=None):
@@ -86,7 +87,7 @@ def audio_recoginze(base_url, data, route='/speech/recognition', api_key='no-key
         if 'text' in resp:
             recoginzed_text = str(resp['text'])
         elif 'error' in resp:
-            print('Error: '+resp['error'])
+            logger.error('Error:', resp['error'])
     
     return recoginzed_text
 

@@ -1,27 +1,31 @@
 import re
 from naoqi import ALModule, ALProxy
 import time
-from tools import chat_completion
-from module_expressions import BehaviourExecutor
 import json
 import threading
 import random
+import Queue  # Python 2.7 queue module
+import logger
 
 class BaseSpeechReceiverModule(ALModule):
     """
-    Use this object to get call back from the ALMemory of the naoqi world.
-    Your callback needs to be a method with two parameter (variable name, value).
+    Speech processing module that handles incoming text messages,
+    sanitizes them with behaviours/expressions, and speaks them via TTS.
+    Acts as a speech box - no LLM or speech recognition functionality.
     """
 
     def __init__( 
             self, strModuleName, strNaoIp, port, 
-            server_url, base_route, api_key, 
-            model_name, save_csv=False, system_prompt='', behaviours_file='behaviours_described.json', sounds_file='sounds_described.json',
-            expressions=None
+            server_url=None, base_route=None, api_key=None, 
+            model_name=None, save_csv=False, system_prompt='', behaviours_file='behaviours_described.json', sounds_file='sounds_described.json',
+            expressions=None, early_speaking_finish=True
         ):
         
         ALModule.__init__(self, strModuleName )
         self.BIND_PYTHON( self.getName(),"callback" )
+
+        # Add shutdown flag
+        self.shutting_down = False
 
         self.SAY_SIGNAL = "Say"
         self.JSON_SAY_SIGNAL = "JSONSay"
@@ -30,394 +34,620 @@ class BaseSpeechReceiverModule(ALModule):
         self.strNaoIp = strNaoIp
         
         self.expressions = expressions
+        self.early_speaking_finish = early_speaking_finish
 
-        self.response_finished = True
-
-        self.server_url = server_url
-        self.base_route = base_route
-        self.api_key = api_key
-        self.model_name = model_name
+        # Message queue system initialisation
+        self.message_queue = Queue.Queue()
+        self.queue_worker_thread = None
+        self.queue_running = False
+        self.queue_lock = threading.Lock()
+        self.speech_counter = 0  # Counter for unique speech IDs
+        
+        # Speaking state management
+        self.is_currently_speaking = False
+        self.speech_finished_event = threading.Event()
+        self.speech_timeout_timer = None  # Add timeout timer
+        self.SPEECH_TIMEOUT = 30.0  # 30 second timeout for speech completion
 
         self.speech = ALProxy('ALAnimatedSpeech')
+        
+        # Test the speech service on initialization
+        try:
+            self.speech.getSupportedLanguages()
+            logger.info("ALAnimatedSpeech service test successful")
+        except Exception as e:
+            logger.error("ALAnimatedSpeech service test failed during initialization:", e)
+        
         self.led_service = ALProxy('ALLeds')
         self.memory = ALProxy("ALMemory", self.strNaoIp, self.port)
-        self.memory.subscribeToEvent("ResetConversation", self.getName(), "clear_all")
-        self.memory.subscribeToEvent("Listening", self.getName(), "handle_listening")
+        
+        # Pre-create and cache proxy instances to avoid thread spawning during stop operations
+        try:
+            self.tts_proxy = ALProxy("ALTextToSpeech", self.strNaoIp, self.port)
+            self.audio_player_proxy = ALProxy("ALAudioPlayer", self.strNaoIp, self.port)
+            logger.debug("Pre-created TTS and AudioPlayer proxies")
+        except Exception as e:
+            logger.warning("Could not pre-create some proxy instances:", e)
+            self.tts_proxy = None
+            self.audio_player_proxy = None
+        
         self.memory.subscribeToEvent("Speaking", self.getName(), "handle_speaking")
-        self.memory.subscribeToEvent("TriggerGapFill", self.getName(), "trigger_gap_fill")
         self.memory.subscribeToEvent("StopSpeech", self.getName(), "stop_speech")
         self.memory.subscribeToEvent("StopAction", self.getName(), "stop_all")
-        self.memory.subscribeToEvent("StopBehaviour", self.getName(), "stop_behaviour")
         self.memory.subscribeToEvent("StopAudio", self.getName(), "stop_audio")
-        self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "clear_display")
-        self.memory.subscribeToEvent("PepperMessage", self.getName(), "pepper_message")
+        self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "finished_speaking")
 
-        self.messages = []
-        self.messages_to_llm = []
-        self.system_prompt = system_prompt
-        self.reset_message()
-
-        self.save_csv = save_csv
-
+        # Simple conversation state tracking (optional)
         self.conversation_ongoing = False
-        self.DISABLE_THINKING = False
 
-        if self.save_csv:
-            with open('dialogue.csv', 'w') as f:
-                f.write('role,content\n')
-                f.close()
+        logger.debug("Speech processing module initialized")
 
-        print("DEBUG: Initializing BehaviourExecutor with behaviour_file: {}".format(behaviours_file))
-
-        TESTING_BEHAVIOURS = False
-
-        if TESTING_BEHAVIOURS:
-            index = 0
-            previous_description = "<NO DESCRIPTION>"
-            while index != -1:
-                animation_test, index = self.expressions.get_next_behaviour(index, previous_description)
-                if animation_test:
-                    animation_test = str(self.expressions.sanitize_behaviour_requests(animation_test)[0])
-                    print("DEBUG: Running test behaviour: {}".format(animation_test))
-                    self.speech.say(animation_test)
-                    
-                    # Wait for user input for the behaviour description
-                    try:
-                        description = None #raw_input("Enter behaviour description (or press Enter to skip): ").strip()
-                    except EOFError:
-                        description = "<NO DESCRIPTION>"
-                    
-                    if not description:
-                        description = "<NO DESCRIPTION>"
-                    
-                    # Log the behaviour and description
-                    print("DEBUG: Behaviour: {}, Description: {}".format(animation_test, description))
-                    previous_description = description
-                else:
-                    break
-
+        # Start the queue worker thread
+        self.start_queue_worker()
 
     # __init__ - end
     def __del__( self ):
-        print( "INF: ReceiverModule.__del__: cleaning everything" )
-        self.stop()
+        """Enhanced destructor that handles all cleanup gracefully"""
+        logger.info("cleaning everything")
+        
+        # Set shutdown flag to prevent new message processing
+        self.shutting_down = True
+        
+        try:
+            # Stop the queue worker first
+            if hasattr(self, 'queue_running'):
+                self.queue_running = False
+                if hasattr(self, 'queue_worker_thread') and self.queue_worker_thread and self.queue_worker_thread.is_alive():
+                    try:
+                        # Add stop signal to wake up the queue
+                        if hasattr(self, 'message_queue'):
+                            self.message_queue.put({"type": "STOP_WORKER"})
+                        self.queue_worker_thread.join(timeout=3)
+                    except:
+                        pass
+            
+            # Unsubscribe from events if memory is still available
+            if hasattr(self, 'memory'):
+                try:
+                    self.memory.unsubscribe('Say', self.getName())
+                    self.memory.unsubscribe('JSONSay', self.getName())
+                    self.memory.unsubscribe('SayChunk', self.getName())
+                    self.memory.unsubscribe('Speaking', self.getName())
+                    self.memory.unsubscribe('StopAction', self.getName())
+                    self.memory.unsubscribe('StopSpeech', self.getName())
+                    self.memory.unsubscribe('StopAudio', self.getName())
+                    self.memory.unsubscribe('ALAnimatedSpeech/EndOfAnimatedSpeech', self.getName())
+                except Exception as e:
+                    logger.warning("Could not unsubscribe from receiver events:", e)
+                    
+        except Exception as e:
+            logger.error("Error during ReceiverModule cleanup:", e)
+        finally:
+            logger.info("cleaned up!")
 
-    def sync_messages(self):
-        self.memory.raiseEvent("SyncMessages", json.dumps(self.messages))
+    def finished_speaking(self, _, value):
+        logger.info("Speech finished event received for value:", value)
+        
+        # Log the raw event details for debugging
+        logger.info("ALAnimatedSpeech/EndOfAnimatedSpeech event - Raw value:", repr(value))
+        
+        # Cancel the timeout timer
+        self.cancel_speech_timeout()
+        
+        # Signal that speech has finished
+        self.is_currently_speaking = False
+        self.speech_finished_event.set()
 
-    def pepper_message(self, _, value):
-        print("DEBUG: Pepper message event received with value {}".format(value))     
-
-    def clear_display(self, _, value):
-        print("DEBUG: Clear display event received")
-        self.memory.raiseEvent("PepperMessage", None)
+        # Don't raise Speaking events directly - let speaking manager handle it
+        logger.debug("Speech finished, letting speaking manager handle Speaking state")
+        
+        # Log queue status when speech finishes
+        with self.queue_lock:
+            queue_size = self.message_queue.qsize()
+            logger.info("Speech finished. Messages still in queue:", queue_size)
 
     def stop_speech(self, _, value):
-        print("DEBUG: Stop speech event received")
+        logger.debug("Stop speech event received")
         threading.Thread(target=self._stop_speech, args=(_, value)).start()
 
     def _stop_speech(self, _, value):
-        tts = ALProxy("ALTextToSpeech")
-        tts.stopAll()
-        self.clear_all(_, value)
-
-    def stop_behaviour(self, _, value):
-        print("DEBUG: Stop behaviour event received")
-        threading.Thread(target=self._stop_behaviour, args=(_, value)).start()
-
-    def _stop_behaviour(self, _, value):
-        self.memory.raiseEvent("RunningBehaviour", False)
-        bhv_manager = ALProxy("ALBehaviorManager")
-        bhv_manager.stopAllBehaviors()
+        try:
+            if self.tts_proxy:
+                self.tts_proxy.stopAll()
+            else:
+                # Fallback to creating proxy if pre-creation failed
+                tts = ALProxy("ALTextToSpeech")
+                tts.stopAll()
+        except Exception as e:
+            logger.warning("Error stopping TTS:", e)
 
     def stop_audio(self, _, value):
-        print("DEBUG: Stop audio event received")
+        logger.debug("Stop audio event received")
         threading.Thread(target=self._stop_audio, args=(_, value)).start()
 
     def _stop_audio(self, _, value):
-        self.memory.raiseEvent("RunningBehaviour", False)
-        audio_player = ALProxy("ALAudioPlayer")
-        audio_player.stopAll()
+        try:
+            self.memory.raiseEvent("RunningBehaviour", False)
+            if self.audio_player_proxy:
+                self.audio_player_proxy.stopAll()
+            else:
+                # Fallback to creating proxy if pre-creation failed
+                audio_player = ALProxy("ALAudioPlayer")
+                audio_player.stopAll()
+        except Exception as e:
+            logger.warning("Error stopping audio:", e)
 
     def stop_all(self, _, value):
-        print("DEBUG: Stop all event received")
-        self.clear_display(_, value)
-        self.stop_speech(_, value)
-        self.stop_behaviour(_, value)
+        """Stop current speech/behaviours and CLEAR all pending queued messages."""
+        logger.info("Stop all event received - stopping speech, behaviours, and clearing queue")
+
+        # Clear the entire message queue first
+        self.clear_message_queue()
+
+        # Stop current speech and explicitly notify speaking manager
+        self.stop_current_speech()
+        
+        # Explicitly notify speaking manager that we're stopping
+        self.memory.raiseEvent("StopSpeaking", None)
+
+        # Stop any playing audio
         self.stop_audio(_, value)
 
-    def clear_all(self, _, value):
-        self.reset_message()
-        self.conversation_ongoing = False
-        self.memory.raiseEvent("ConversationOngoing", False)
-        self.memory.raiseEvent("Speaking", False)
-        self.memory.raiseEvent("RunningBehaviour", False)
-
-    def reset_message(self):
-        self.messages_to_llm = [{
-            "role":"system",
-            "content": self.system_prompt or "You are an assistant names Pepper, your job is to answer users' questions in short."
-        }]
-        self.messages = []
-        self.sync_messages()
+        logger.info("Stop all completed - queue cleared and all actions stopped")
 
     def start( self ):
-        self.memory.subscribeToEvent("SpeechRecognition", self.getName(), "processRemote")
         self.memory.subscribeToEvent("Say", self.getName(), "processRemote")
         self.memory.subscribeToEvent("JSONSay", self.getName(), "processRemote")
-        # print( "INF: ReceiverModule: started!" )
-
+        self.memory.subscribeToEvent("SayChunk", self.getName(), "processRemote")
+        logger.info("started!")
 
     def stop( self ):
-        print( "INF: ReceiverModule: stopping..." )
+        """Enhanced stop to shutdown queue worker"""
+        logger.info("stopping...")
         try:
-            self.memory.unsubscribe('SpeechRecognition', self.getName())
-            if hasattr(self, 'stop_listening_thread'):
-                self.stop_listening_thread.set()
-            if hasattr(self, 'listening_thread') and self.listening_thread.is_alive():
-                self.listening_thread.join()
+            # Stop the queue worker
+            self.stop_queue_worker()
+            
+            # Original stop functionality
+            self.memory.unsubscribe('Say', self.getName())
+            self.memory.unsubscribe('JSONSay', self.getName())
+            self.memory.unsubscribe('SayChunk', self.getName())
         finally:
-            print( "INF: ReceiverModule: stopped!" )
-
-    def version( self ):
-        return "1.1"
-    
-    def trigger_gap_fill(self, _, value):
-        self.disable_thinking = not value
+            logger.info("stopped!")
 
     def handle_speaking(self, _, speaking):
-        if speaking:
-            self.handle_listening(self, not speaking)
-    
-    def handle_listening(self, _, is_listening):
-        # Runs a thread that indefinitely runs random listening behaviours until the thread is stopped
-        print("DEBUG: Listening event received with value: {}".format(is_listening))
-        if is_listening:
-            # We are listening. We should start running "listening" behaviours
-            self.listening = True
-            self.stop_listening_thread = threading.Event()
-            self.listening_thread = threading.Thread(target=self.run_listening_behaviours, args=(self.stop_listening_thread, self.expressions, self.speech))
-            self.listening_thread.start()
-        else:
-            # We have stopped listening. We should stop running "listening" behaviours
-            if hasattr(self, 'stop_listening_thread'):
-                self.stop_listening_thread.set()
-            if hasattr(self, 'listening_thread') and self.listening_thread.is_alive():
-                self.listening_thread.join()
-            # # Set the LEDs to white
-            # self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
+        # Handle speaking state changes from centralized speaking manager
+        logger.debug("Speaking event received:", speaking)
 
-    def run_listening_behaviours(self, stop_event, executor, speech):
-        while not stop_event.is_set():
-            # Set the LEDs to green
-            self.led_service.fadeRGB('AllLeds', 0x00FF00, 0.1)
-            # LISTENING_BEHAVIOURS = ['listening'] # FIXME: This might be doing weird things....
-            # random_behaviour = random.choice(LISTENING_BEHAVIOURS)
-            # listening_message = "^start({})^wait({})".format(random_behaviour, random_behaviour)
-            # listening_message, _, _ = executor.sanitize_behaviour_requests(listening_message)
-            # speech.say(listening_message)
-            time.sleep(1)
+    def start_queue_worker(self):
+        """Start the message queue worker thread"""
+        if not self.queue_running:
+            self.queue_running = True
+            self.queue_worker_thread = threading.Thread(target=self.process_message_queue)
+            self.queue_worker_thread.daemon = True
+            self.queue_worker_thread.start()
+            logger.debug("Message queue worker started")
+
+    def stop_queue_worker(self):
+        """Stop the message queue worker thread"""
+        self.queue_running = False
+        if self.queue_worker_thread and self.queue_worker_thread.is_alive():
+            # Add a special stop message to wake up the queue
+            self.message_queue.put({"type": "STOP_WORKER"})
+            self.queue_worker_thread.join(timeout=5)
+            logger.debug("Message queue worker stopped")
+
+    def process_message_queue(self):
+        """Worker thread to process messages from the queue"""
+        logger.debug("Queue worker thread started")
         
-        # Set the LEDs to white
-        # self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
+        while self.queue_running:
+            try:
+                # Get message from queue with timeout
+                message_item = self.message_queue.get(timeout=1)
+                
+                # Check for stop signal
+                if message_item.get("type") == "STOP_WORKER":
+                    break
+                
+                # Process the message with error handling
+                try:
+                    self.process_queued_message(message_item)
+                except Exception as e:
+                    logger.error("Error processing queued message:", e)
+                    # Ensure we mark task as done even if processing fails
+                
+                # Mark task as done
+                self.message_queue.task_done()
+                
+                # Log queue status after processing
+                logger.debug("Queue worker processed message, remaining queue size:", self.message_queue.qsize())
+                
+            except Queue.Empty:
+                # Timeout occurred, continue loop
+                continue
+            except Exception as e:
+                logger.error("Queue worker error:", e)
+                
+        logger.debug("Queue worker thread ended")
+
+    def process_queued_message(self, message_item):
+        """Process a single message from the queue"""
+        try:
+            signal_name = message_item["signal"]
+            message_text = message_item["message_text"]
+            speech_id = message_item["speech_id"]
+            
+            logger.info("Processing queued message - Signal:", signal_name, "Speech ID:", speech_id, "Queue remaining:", self.message_queue.qsize())
+            
+            # Notify speaking manager about queue activity
+            self.memory.raiseEvent("DequeueResult", {"speech_id": speech_id})
+            
+            # Stop any current speech before starting new one
+            if self.is_currently_speaking:
+                logger.debug("Stopping current speech for new message")
+                self.stop_current_speech()
+            
+            # Process the text message
+            self.process_text_message(message_text, speech_id)
+                
+        except Exception as e:
+            logger.error("Error processing queued message:", e)
+            # Ensure speaking manager knows this speech failed
+            if 'speech_id' in locals():
+                self.memory.raiseEvent("StopSpeaking", speech_id)
+
+    def stop_current_speech(self):
+        """Stop current speech without triggering global StopAction (preserve queue)."""
+        try:
+            if self.is_currently_speaking:
+                # Stop animated speech / tts directly using cached proxies
+                try:
+                    if self.tts_proxy:
+                        self.tts_proxy.stopAll()
+                    else:
+                        tts = ALProxy("ALTextToSpeech")
+                        tts.stopAll()
+                except Exception:
+                    pass
+                try:
+                    self.speech.stopAll()
+                except Exception:
+                    pass
+
+                # Signal running behaviour stopped
+                try:
+                    self.memory.raiseEvent("RunningBehaviour", False)
+                except Exception:
+                    pass
+
+                # Wait for ALAnimatedSpeech end event (with timeout)
+                self.speech_finished_event.wait(timeout=2)
+                self.speech_finished_event.clear()
+
+                # Update state
+                self.is_currently_speaking = False
+                logger.debug("Current speech stopped (direct stop)")
+        except Exception as e:
+            logger.error("Error stopping current speech:", e)
+
+    def extract_text_from_message(self, signal_name, raw_message):
+        """Extract plain text from various message formats"""
+        if raw_message is None:
+            return ""
+        
+        # Convert to string
+        message_str = str(raw_message).strip()
+        
+        if not message_str:
+            return ""
+        
+        # Handle JSONSay format - extract chat_response from JSON
+        if signal_name == self.JSON_SAY_SIGNAL:
+            try:
+                # Try to parse as JSON
+                if message_str.startswith('{') and message_str.endswith('}'):
+                    message_dict = json.loads(message_str)
+                    text = message_dict.get('chat_response', message_str)
+                    logger.debug("Extracted text from JSON:", text)
+                    return text
+                else:
+                    # Not valid JSON, treat as plain text
+                    logger.debug("JSONSay message not valid JSON, treating as plain text")
+                    return message_str
+            except (ValueError, json.JSONDecodeError) as e:
+                logger.debug("Failed to parse JSONSay as JSON:", e, "treating as plain text")
+                return message_str
+        
+        # For Say and SayChunk, return as-is
+        return message_str
 
     def processRemote(self, signalName, message):
-        print("DEBUG: Received from: {}".format(signalName))
-        print("DEBUG: Received message: {}".format(message))
-        
-        if message is None:
-            print("DEBUG: Received message is None. Ignoring.")
+        """Add messages to queue for processing"""
+        # Don't process new messages during shutdown
+        if getattr(self, 'shutting_down', False):
             return
+
+        logger.debug("Received from:", signalName)
+        logger.debug("Received message:", message)
+
+        if message is None:
+            logger.debug("Received message is None. Ignoring.")
+            return
+
+        # Extract plain text from the message
+        message_text = self.extract_text_from_message(signalName, message)
         
-        # While we process the message, we should stop the speech recognition
-        self.memory.raiseEvent("Speaking", True)
-        # Set the LEDs to white
-        self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.5)
+        if not message_text:
+            logger.debug("No text content found in message. Ignoring.")
+            return
 
-        # Do something with the received speech recognition result
-        # If pepper is triggered, only respond to messages that contain the trigger keywords
-        PEPPER_TRIGGER = True
-        PEPPER_NAME = "Pepper"
-        PEPPER_TRIGGER_KEYWORDS = [
-            "pepper", "peper", "peppa", "pepa", "papa", "pappa", "piper", "pipper", 
-            "pipa", "pippa", "poppa", "pepor", "pepur", "pepr", "peppar", "peppur", 
-            "peppor", "peppur", "pepur", "pepor", "pepr", "peppur", "peppor", "pepur",
-            "paper", "people", "heather", "pepperoni", "feather", "baby", "puppy", "peppy",
-            "poppy", "pippy", "peppermint", "debra"
-        ]
-        THINKING_BEHAVIOURS = ['thinking', 'think', 'thoughtful']
-        THINKING_PHRASES = [
-            "hmm one moment", "thinking", "let's see", "one sec", "just a sec", "let me think", 
-            "hmm... one sec", "one moment", "just thinking", "give me a sec", 
-            "just thinking...", "just a moment", "sorry, one sec",
-            "processing that", "hmmm just a sec", "hmm let's see", "just a second", 
-            "just processing", "thinking now", "thinking about that"
-        ]
-        
-        def think_about_response(executor, speech):
-            self.memory.raiseEvent("Log", "[THINK_RESP]I heard you say \""+message+"\", let me think...")
-            # Set the LEDs to blue
-            self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
-            
-            random_thinking_behaviour = random.choice(THINKING_BEHAVIOURS)
-            random_thinking_phrase = random.choice(THINKING_PHRASES)
-            thinking_message = "^start({}) {} ^stop({})".format(random_thinking_behaviour, random_thinking_phrase, random_thinking_behaviour)
-            thinking_message, _, _ = executor.sanitize_behaviour_requests(thinking_message)
-
-            speech.say(thinking_message)
-
-        def eyes_thinking_about_response():
-            # Animate the eyes to show thinking
-            self.led_service.rotateEyes(0x0000FF, 1, 3)
-
-        # the LLM will set conversation_ongoing to True if it believes the conversation is ongoing
-        # When the LLM sets to false, we should reset the conversation_ongoing flag
-        # New conversation will be triggered by seeing if the keywords are present and setting conversation_ongoing to True
-        print("DEBUG: Received message: {}".format(message))
-        
-        # Convert the message to json if it is not already
-        if message and signalName == self.SAY_SIGNAL:
-                message_dict = {'chat_response': message, 'conversation_ongoing': False}
-                resp_text = json.dumps(message_dict)
-        
-        # Send the message to the chatbot server
-        if not (signalName == self.SAY_SIGNAL or signalName == self.JSON_SAY_SIGNAL):
-            # Replace all trigger keywords with "Pepper" in the message        
-            for keyword in PEPPER_TRIGGER_KEYWORDS:
-                message = re.sub(r'\b{}\b'.format(re.escape(keyword)), PEPPER_NAME, message, flags=re.IGNORECASE)
-
-            # If we are in a pepper trigger mode, we should only respond to messages that contain "Pepper"
-            if not self.conversation_ongoing and PEPPER_TRIGGER:
-                if PEPPER_NAME.lower() not in message.lower():
-                    print("DEBUG: Message does not contain the trigger keyword 'Pepper'.")
-                    self.reset_message()
-                    self.memory.raiseEvent("Speaking", False)
-                    return
-
-            print("DEBUG: Sanitised message: {}".format(message))
-
-            user_msg = {'role':'user', 'content': message}
-            self.messages.append(user_msg)
-            self.messages_to_llm.append(user_msg)
-            self.sync_messages()
-
-            if not self.DISABLE_THINKING:
-                # Set the LEDs to blue
-                self.led_service.fadeRGB('AllLeds', 0x0000FF, 0.5)
-                behaviour_thread = threading.Thread(target=think_about_response, args=(self.expressions, self.speech))
-                behaviour_thread.start()
-
-                eyes_thread = threading.Thread(target=eyes_thinking_about_response)
-                eyes_thread.start()
-
-            start_time = time.time()
-            print("DEBUG: Sending message to chatbot server")
-
-            # Send the message to the chatbot server
-            resp_text = chat_completion(
-                self.server_url, 
-                self.messages_to_llm, 
-                route=self.base_route, 
-                model_name=self.model_name, 
-                api_key=self.api_key
-            )
-        
-            print("DEBUG: Response took {} seconds.".format(time.time() - start_time))
-            print("DEBUG: Received response text: {}".format(resp_text))
-            
-            #if resp_test contains "HTTP Error"
-            if "HTTP Error" in resp_text:
-                print("ERR: HTTP Error in response text.")
-                self.memory.raiseEvent("Speaking", False)
-                return
-            
-            # Stop eyes thread
-            eyes_thread.join()
-            print("After eyes_thread.join()")
-            
-            # Forcibly stop behaviour thread
-            if behaviour_thread.is_alive():
-                self.stop_listening_thread.set()
-                behaviour_thread.join()
-            
-            # Set the LEDs to white
-            self.led_service.fadeRGB('AllLeds', 0xFFFFFF, 0.1)
-
-        # Sanitize the response text to extract only the JSON component
-        json_start = resp_text.find('{')
-        json_end = resp_text.rfind('}') + 1
-        if json_start != -1 and json_end != -1:
-            resp_text = resp_text[json_start:json_end]
-        else:
-            print("DEBUG: No valid JSON found in response text.")
-            self.memory.raiseEvent("Speaking", False)
-            return            
-
-        # Sanitize the response to text replace any non ascii characters with ascii equivalents
-        resp_text = resp_text.encode('ascii', 'ignore').decode('ascii')
-
-        if resp_text:
-            # Decode the message JSON format, example: {'chat_response': 'Hey, how are you?', `conversation_ongoing`: True}
-            # Only decode the message if it is in the correct JSON format
+        # Pre-sanitise the text if expressions module is available (WITHOUT speed controls)
+        if self.expressions:
             try:
-                message_dict = eval(resp_text.replace('true', 'True').replace('false', 'False'))
-                chat_response = message_dict.get('chat_response', '')
-                self.conversation_ongoing = message_dict.get('conversation_ongoing', False)
+                sanitised_text, behaviour_triggered, spoken_response = self.expressions.sanitise_request(message_text, add_speed_controls=False)
+                logger.debug("Pre-sanitised message from", message_text, "to", sanitised_text)
+                message_text = sanitised_text
+            except Exception as e:
+                logger.warning("Failed to pre-sanitise message:", e, "using original text")
 
-                if self.conversation_ongoing is True:
-                    self.memory.raiseEvent("ConversationOngoing", True)
-
-                if not chat_response:
-                    print("DEBUG: Message does not contain 'chat_response' or told not to respond.")
-                    self.memory.raiseEvent("Speaking", False)
-                    return
-
-                # If we want to respond, only respond if we have a chat_response
-                elif chat_response:
-                    # Sanitize the chat_response to replace behaviour requests with full paths
-                    chat_response, behaviour_triggered, spoken_response = self.expressions.sanitize_request(chat_response)
-                    resp_message = chat_response
+        # Check for message aggregation opportunity
+        with self.queue_lock:
+            queue_size = self.message_queue.qsize()
+            
+            # If there are 2 or more messages in queue, aggregate with the last message
+            if queue_size >= 2:
+                # Convert queue to list to access items
+                queue_items = []
                 
-                else:
-                    print("DEBUG: Message does not contain 'chat_response'.")
-                    self.memory.raiseEvent("Speaking", False)
-                    return
+                # Extract all items from queue safely
+                while not self.message_queue.empty():
+                    try:
+                        item = self.message_queue.get_nowait()
+                        self.message_queue.task_done()  # Mark as done since we're removing it
+                        queue_items.append(item)
+                    except Queue.Empty:
+                        break
+                
+                # Aggregate with the last item (most recent in queue)
+                if queue_items:
+                    last_item = queue_items[-1]
+                    
+                    # Check if the last message needs punctuation
+                    last_text = last_item["message_text"].strip()
+                    needs_punctuation = last_text and not last_text.endswith(('.', '!', '?', ';', ':'))
+                    
+                    # Combine the message text with proper punctuation
+                    if needs_punctuation:
+                        combined_text = last_item["message_text"] + ". " + message_text
+                    else:
+                        combined_text = last_item["message_text"] + " " + message_text
+                    
+                    last_item["message_text"] = combined_text
+                    logger.info("Aggregated message: '{}' + '{}' -> '{}'".format(
+                        last_text, 
+                        message_text, 
+                        combined_text
+                    ))
+                
+                # Put all items back in queue
+                for item in queue_items:
+                    self.message_queue.put(item)
+                
+                # Don't add the new message as it's been aggregated
+                # Don't notify speaking manager since we didn't add a new message
+                logger.debug("Message aggregated, not adding to queue")
+                return
 
-            except (SyntaxError, KeyError) as e:
-                print("DEBUG: Failed to decode message: {}".format(e))
-                self.memory.raiseEvent("Speaking", False)
+        # No aggregation - proceed with normal message queuing
+        # Generate unique speech ID
+        self.speech_counter += 1
+        speech_id = "speech_{}".format(self.speech_counter)
+        
+        # Create message item for queue
+        message_item = {
+            "signal": signalName,
+            "message_text": message_text,
+            "speech_id": speech_id,
+            "timestamp": time.time()
+        }
+        
+        # Notify speaking manager about queue activity
+        self.memory.raiseEvent("QueueSpeech", {"speech_id": speech_id})
+        
+        # Add to queue
+        try:
+            self.message_queue.put(message_item, timeout=1)
+            logger.debug("Message added to queue - Speech ID:", speech_id, "Queue size:", self.message_queue.qsize())
+        except Queue.Full:
+            logger.error("Message queue is full, dropping message")
+
+    def start_speech_timeout(self, speech_id):
+        """Start a timeout timer for speech completion"""
+        if self.speech_timeout_timer:
+            self.speech_timeout_timer.cancel()
+        
+        self.speech_timeout_timer = threading.Timer(self.SPEECH_TIMEOUT, self.on_speech_timeout, args=[speech_id])
+        self.speech_timeout_timer.start()
+        logger.debug("Started speech timeout timer for speech_id:", speech_id)
+
+    def cancel_speech_timeout(self):
+        """Cancel the speech timeout timer"""
+        if self.speech_timeout_timer:
+            self.speech_timeout_timer.cancel()
+            self.speech_timeout_timer = None
+            logger.debug("Cancelled speech timeout timer")
+
+    def on_speech_timeout(self, speech_id):
+        """Handle speech timeout - force completion"""
+        logger.error("Speech timeout occurred for speech_id:", speech_id)
+        logger.error("Forcing speech completion due to timeout")
+        
+        # Force speech completion
+        self.is_currently_speaking = False
+        self.speech_finished_event.set()
+        
+        # Try to stop any running speech
+        try:
+            if self.tts_proxy:
+                self.tts_proxy.stopAll()
+            self.speech.stopAll()
+        except Exception as e:
+            logger.error("Error stopping speech during timeout:", e)
+        
+        # Notify speaking manager
+        self.memory.raiseEvent("StopSpeaking", speech_id)
+        self.memory.raiseEvent("RunningBehaviour", False)
+
+    def process_text_message(self, message_text, speech_id):
+        """Process a text message for speech output"""
+        try:
+            logger.info("Starting to process text message with speech_id:", speech_id)
+            
+            # Apply final sanitization with speed controls to the complete message
+            if self.expressions:
+                try:
+                    final_sanitised_text, behaviour_triggered, spoken_response = self.expressions.sanitise_request(message_text, add_speed_controls=True)
+                    logger.debug("Final sanitisation with speed controls applied")
+                    message_text = final_sanitised_text
+                except Exception as e:
+                    logger.warning("Failed to apply final sanitisation:", e, "using original text")
+
+            # Check if early speaking finish is enabled and if this message has a trailing ^run
+            if self.early_speaking_finish and speech_id:
+                # Check if there are any pending messages in the queue (this should be the last one)
+                with self.queue_lock:
+                    queue_empty = self.message_queue.empty()
+                
+                if queue_empty:
+                    # This is the final message, check for trailing ^run behavior
+                    message_text = self.add_early_speaking_finish(message_text, speech_id)
+
+            # Strip brace segments (e.g. { ... }) from what will be spoken
+            cleaned_text = self._strip_brace_segments(message_text)
+            
+            if not cleaned_text.strip():
+                logger.debug("Response empty after cleaning. Skipping speech.")
+                # Notify speaking manager that this speech is complete
+                self.memory.raiseEvent("StopSpeaking", speech_id)
                 return
             
-            behaviour_triggered = False
+            logger.info("Speech Output:\n================================\n", cleaned_text, "\n================================\n")
             
-            if not (signalName == self.SAY_SIGNAL or signalName == self.JSON_SAY_SIGNAL):
-                # Only dispaly the message if the chatbot wants to respond
-                self.memory.raiseEvent("UserMessage", message)
-            
-            # Clear speech recognition buffer
-            self.memory.raiseEvent("ClearSpeechRecognitionBuffer", None)
+            # Mark speaking state and notify speaking manager BEFORE speaking
+            if not self.is_currently_speaking:
+                self.is_currently_speaking = True
+                
+                # Notify speaking manager
+                self.memory.raiseEvent("StartSpeaking", speech_id)
+                logger.info("Notified speaking manager to start speaking with speech_id:", speech_id)
+            else:
+                logger.debug("Already speaking, not toggling Speaking event")
 
-            print("AI Inference Result:\n================================\n"+resp_message+"\n================================\n")
-            # self.memory.raiseEvent("PepperMessage", spoken_response)
+            # Set running behaviour flag
             self.memory.raiseEvent("RunningBehaviour", True)
-            self.speech.say(resp_message)
 
-            if(len(self.messages_to_llm) > 1):
-                self.messages.append({'role':'assistant','content':resp_message})
-                self.messages_to_llm.append({'role':'assistant','content':resp_text})
-                self.sync_messages()
+            # Start speech timeout
+            self.start_speech_timeout(speech_id)
 
-            if self.save_csv:
-                with open('dialogue.csv', 'a') as f:
-                    f.write('user,"'+message.replace('"', '\\"')+'"\n')
-                    f.write('assistant,"'+resp_message.replace('"', '\\"')+'"\n')
-                    if behaviour_triggered:
-                        f.write('behaviour triggered,"'+behaviour_triggered.replace('"', '\\"')+'"\n')
-                    f.close()
+            # Execute the speech with enhanced error handling and logging
+            try:
+                logger.info("Executing speech.say() with text:", repr(cleaned_text[:100]))
+                # Execute the speech
+                logger.info("About to call speech.say() - speech_id:", speech_id)
+                self.speech.say(cleaned_text)
+                logger.info("speech.say() call completed successfully for speech_id:", speech_id)
+                
+                # Log the fact that we're waiting for the EndOfAnimatedSpeech event
+                logger.info("Waiting for ALAnimatedSpeech/EndOfAnimatedSpeech event for speech_id:", speech_id)
+                
+            except Exception as speech_error:
+                logger.error("Error during speech.say() execution:", speech_error)
+                logger.error("Speech error details - Text length:", len(cleaned_text), "Speech ID:", speech_id)
+                
+                # Try to get more details about the error
+                try:
+                    import traceback
+                    logger.error("Speech error traceback:", traceback.format_exc())
+                except:
+                    pass
+                
+                # Cancel timeout and mark as not speaking
+                self.cancel_speech_timeout()
+                self.is_currently_speaking = False
+                self.memory.raiseEvent("StopSpeaking", speech_id)
+                self.memory.raiseEvent("RunningBehaviour", False)
+                raise speech_error
 
-            if not self.conversation_ongoing:
-                self.memory.raiseEvent("ConversationOngoing", False)
+        except Exception as e:
+            logger.error("Error processing text message:", e)
+            # Ensure we notify speaking manager on error
+            if speech_id:
+                self.memory.raiseEvent("StopSpeaking", speech_id)
+            # Reset local speaking state
+            self.is_currently_speaking = False
+            # Cancel timeout
+            self.cancel_speech_timeout()
 
-                if not (signalName == self.SAY_SIGNAL or signalName == self.JSON_SAY_SIGNAL):
-                    self.memory.raiseEvent("ResetConversation", True)
-        self.memory.raiseEvent("Speaking", False)
+    def add_early_speaking_finish(self, message_text, speech_id):
+        """Add $StopSpeaking event before trailing ^run(...) behaviors"""
+        try:
+            # Pattern to match trailing ^run(...) at the end of the message
+            # This regex looks for ^run(...) that appears at the end, possibly followed by whitespace and braces
+            import re
+            
+            # Match ^run(...) followed only by optional whitespace and brace segments
+            trailing_run_pattern = r'(\^run\([^)]+\))(\s*\{[^}]*\})*\s*$'
+            
+            match = re.search(trailing_run_pattern, message_text)
+            
+            if match:
+                # Found a trailing ^run behavior
+                run_behavior = match.group(0)  # The entire matched trailing section
+                
+                # Find the position where the trailing ^run starts
+                run_start = match.start()
+                
+                # Split the message into before and after the trailing ^run
+                before_run = message_text[:run_start]
+                
+                # Insert $StopSpeaking event before the trailing ^run
+                stop_speaking_event = "$StopSpeaking={}".format(speech_id)
+                
+                # Reconstruct the message with the event inserted
+                modified_message = before_run + " " + stop_speaking_event + " " + run_behavior
+                
+                logger.info("Added early speaking finish event before trailing ^run behavior")
+                logger.debug("Original:", message_text)
+                logger.debug("Modified:", modified_message)
+                
+                return modified_message
+            
+            # No trailing ^run found, return original message
+            return message_text
+            
+        except Exception as e:
+            logger.error("Error adding early speaking finish:", e)
+            return message_text
+
+    def _strip_brace_segments(self, text):
+        """Remove any { ... } segments (and leading whitespace before them), then collapse extra spaces"""
+        cleaned = re.sub(r'\s*\{[^}]*\}', '', text)
+        cleaned = re.sub(r' +', ' ', cleaned).strip()
+        return cleaned
+
+    def clear_message_queue(self):
+        """Clear all pending messages from the queue"""
+        with self.queue_lock:
+            # Clear the queue and mark all tasks as done
+            while not self.message_queue.empty():
+                try:
+                    self.message_queue.get_nowait()
+                    self.message_queue.task_done()
+                except Queue.Empty:
+                    break
+
+            # Notify speaking manager that queue is cleared
+            self.memory.raiseEvent("ClearQueue", True)
+
+            logger.debug("Message queue cleared")
