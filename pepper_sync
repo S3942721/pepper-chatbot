@@ -5,15 +5,17 @@ import sys
 import subprocess
 import glob
 import argparse
+import re
+import shutil
 
 # Constants
 DEFAULT_IP = "192.168.1.100"
 REMOTE_USER = "nao"
+DEFAULT_HOSTNAME = "haku.local"
 REMOTE_FOLDER = "/home/nao/pepperchat"
 LOCAL_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 HTML_FILES = glob.glob(os.path.join(os.path.dirname(LOCAL_FOLDER), "*.html"))
 HTML_REMOTE_PATH = "~/.local/share/PackageManager/apps/rmit-race/html"
-PASSWORD_FILE = os.path.join(os.path.dirname(LOCAL_FOLDER), ".pepper_password")
 REMOTE_JSON_FILE = "pepperchat/behaviours/behaviours_described.json"
 LOCAL_JSON_FILE = os.path.join(LOCAL_FOLDER, "robot_behaviours_described.json")
 REMOTE_EXPLORER_FOLDER = "~/.local/share/Explorer"
@@ -23,86 +25,587 @@ REMOTE_MEDIA_FOLDER = os.path.join(REMOTE_FOLDER, "media")
 LOCAL_HANDS_ABOVE_HEAD_FOLDER = os.path.join(LOCAL_FOLDER, "strikeapose/hands_above_head")
 REMOTE_HANDS_ABOVE_HEAD_FOLDER = "~/.local/share/PackageManager/apps/hands_above_head"
 
-def run_command(command):
-    """Run a shell command and print it."""
-    print(f"Running command: {command}")
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"Error: {result.stderr}")
-        sys.exit(result.returncode)
-    print(result.stdout)
+# SSH Configuration
+SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
+SSH_KEY_FILE = os.path.expanduser("~/.ssh/id_ed25519_nao")
+HOST_NAME = "haku"
 
-def sync_files(remote_ip, sync_html, sync_hands_above_head, sync_media, delete_remote):
+def run_command(command, capture_output=True):
+    """Run a shell command and print it."""
+    print(f"Running: {' '.join(command) if isinstance(command, list) else command}")
+    
+    if capture_output:
+        # For commands where we want to capture output (like mkdir, rm, etc.)
+        if isinstance(command, str):
+            result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        else:
+            result = subprocess.run(command, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"Error: {result.stderr}")
+            sys.exit(result.returncode)
+        
+        if result.stdout.strip():
+            print(result.stdout.strip())
+        
+        return result
+    else:
+        # For commands where we want real-time output (like scp)
+        if isinstance(command, str):
+            result = subprocess.run(command, shell=True)
+        else:
+            result = subprocess.run(command)
+        
+        if result.returncode != 0:
+            print(f"Error: Command failed with return code {result.returncode}")
+            sys.exit(result.returncode)
+        
+        return result
+
+def check_rsync_available():
+    """Check if rsync is available on the system."""
+    return shutil.which("rsync") is not None
+
+def validate_ip(ip):
+    """Validate IP address format."""
+    pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+    if not re.match(pattern, ip):
+        return False
+    
+    # Check each octet is between 0-255
+    octets = ip.split('.')
+    return all(0 <= int(octet) <= 255 for octet in octets)
+
+def get_current_config_ip():
+    """Get the current IP from SSH config for pepper robot."""
+    if not os.path.exists(SSH_CONFIG_FILE):
+        return None
+    
+    try:
+        with open(SSH_CONFIG_FILE, 'r') as f:
+            config_content = f.read()
+        
+        lines = config_content.split('\n')
+        in_pepper_host = False
+        
+        for line in lines:
+            if line.strip() == f"Host {HOST_NAME}":
+                in_pepper_host = True
+            elif line.startswith('Host ') and in_pepper_host:
+                in_pepper_host = False
+            elif in_pepper_host and line.strip().startswith('HostName'):
+                return line.split()[1]
+        
+        return None
+    except Exception:
+        return None
+
+def validate_ip_or_hostname(address):
+    """Validate IP address format or return True for hostname."""
+    # Check if it's an IP address
+    ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+    if re.match(ip_pattern, address):
+        # Validate IP address octets
+        octets = address.split('.')
+        return all(0 <= int(octet) <= 255 for octet in octets)
+    else:
+        # Assume it's a hostname - basic validation
+        hostname_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$'
+        print("⚠️  WARNING: Using hostname directly may be slower than IP address or SSH config!")
+        return re.match(hostname_pattern, address) is not None
+
+def set_pepper_ip(address=None):
+    """Standalone function to set pepper IP/hostname in SSH config."""
+    if not address:
+        current_ip = get_current_config_ip()
+        print("Set Pepper Robot IP Address or Hostname")
+        print("=" * 40)
+        if current_ip:
+            print(f"Current address: {current_ip}")
+        else:
+            print("No current configuration found")
+        
+        while True:
+            address = input("Enter new IP address or hostname: ").strip()
+            if validate_ip_or_hostname(address):
+                break
+            print("Invalid IP address or hostname format. Please try again.")
+    
+    if not validate_ip_or_hostname(address):
+        print(f"Error: Invalid IP address or hostname format: {address}")
+        return False
+    
+    update_ssh_config(address)
+    
+    # Test connection
+    if test_connection(HOST_NAME):
+        print("✓ Connection test successful!")
+        return True
+    else:
+        print("✗ Connection test failed. Please check if the robot is online.")
+        return False
+
+def update_ssh_config(address):
+    """Update SSH config with new IP/hostname for pepper robot."""
+    print(f"Updating SSH config for {HOST_NAME} -> {address}")
+    
+    # Create SSH config if it doesn't exist
+    if not os.path.exists(SSH_CONFIG_FILE):
+        os.makedirs(os.path.dirname(SSH_CONFIG_FILE), exist_ok=True)
+        open(SSH_CONFIG_FILE, 'a').close()
+        os.chmod(SSH_CONFIG_FILE, 0o600)
+    
+    # Read current config
+    with open(SSH_CONFIG_FILE, 'r') as f:
+        config_content = f.read()
+    
+    # Check if pepper-robot host already exists
+    host_pattern = f"Host {HOST_NAME}"
+    if host_pattern in config_content:
+        # Update existing configuration
+        lines = config_content.split('\n')
+        new_lines = []
+        in_pepper_host = False
+        
+        for line in lines:
+            if line.strip() == f"Host {HOST_NAME}":
+                in_pepper_host = True
+                new_lines.append(line)
+            elif line.startswith('Host ') and in_pepper_host:
+                in_pepper_host = False
+                new_lines.append(line)
+            elif in_pepper_host and line.strip().startswith('HostName'):
+                new_lines.append(f"    HostName {address}")
+            else:
+                new_lines.append(line)
+        
+        config_content = '\n'.join(new_lines)
+    else:
+        # Add new configuration
+        if config_content and not config_content.endswith('\n'):
+            config_content += '\n'
+        
+        config_content += f"""
+Host {HOST_NAME}
+    HostName {address}
+    User {REMOTE_USER}
+    IdentityFile {SSH_KEY_FILE}
+"""
+    
+    # Write updated config
+    with open(SSH_CONFIG_FILE, 'w') as f:
+        f.write(config_content)
+    
+    print(f"✓ SSH config updated. You can now use: ssh {HOST_NAME}")
+
+
+# def update_ssh_config(ip):
+#     """Update SSH config with new IP for pepper robot."""
+#     print(f"Updating SSH config for {HOST_NAME} -> {ip}")
+    
+#     # Create SSH config if it doesn't exist
+#     if not os.path.exists(SSH_CONFIG_FILE):
+#         os.makedirs(os.path.dirname(SSH_CONFIG_FILE), exist_ok=True)
+#         open(SSH_CONFIG_FILE, 'a').close()
+#         os.chmod(SSH_CONFIG_FILE, 0o600)
+    
+#     # Read current config
+#     with open(SSH_CONFIG_FILE, 'r') as f:
+#         config_content = f.read()
+    
+#     # Check if pepper-robot host already exists
+#     host_pattern = f"Host {HOST_NAME}"
+#     if host_pattern in config_content:
+#         # Update existing configuration
+#         lines = config_content.split('\n')
+#         new_lines = []
+#         in_pepper_host = False
+        
+#         for line in lines:
+#             if line.strip() == f"Host {HOST_NAME}":
+#                 in_pepper_host = True
+#                 new_lines.append(line)
+#             elif line.startswith('Host ') and in_pepper_host:
+#                 in_pepper_host = False
+#                 new_lines.append(line)
+#             elif in_pepper_host and line.strip().startswith('HostName'):
+#                 new_lines.append(f"    HostName {ip}")
+#             else:
+#                 new_lines.append(line)
+        
+#         config_content = '\n'.join(new_lines)
+#     else:
+#         # Add new configuration
+#         if config_content and not config_content.endswith('\n'):
+#             config_content += '\n'
+        
+#         config_content += f"""
+# Host {HOST_NAME}
+#     HostName {ip}
+#     User {REMOTE_USER}
+#     IdentityFile {SSH_KEY_FILE}
+# """
+    
+#     # Write updated config
+#     with open(SSH_CONFIG_FILE, 'w') as f:
+#         f.write(config_content)
+    
+#     print(f"✓ SSH config updated. You can now use: ssh {HOST_NAME}")
+
+# def set_pepper_ip(ip=None):
+#     """Standalone function to set pepper IP in SSH config."""
+#     if not ip:
+#         current_ip = get_current_config_ip()
+#         print("Set Pepper Robot IP Address")
+#         print("=" * 30)
+#         if current_ip:
+#             print(f"Current IP: {current_ip}")
+#         else:
+#             print("No current configuration found")
+        
+#         while True:
+#             ip = input("Enter new IP address: ").strip()
+#             if validate_ip(ip):
+#                 break
+#             print("Invalid IP address format. Please try again.")
+    
+#     if not validate_ip(ip):
+#         print(f"Error: Invalid IP address format: {ip}")
+#         return False
+    
+#     update_ssh_config(ip)
+    
+#     # Test connection
+#     if test_connection(HOST_NAME):
+#         print("✓ Connection test successful!")
+#         return True
+#     else:
+#         print("✗ Connection test failed. Please check if the robot is online.")
+#         return False
+
+def setup_ssh_environment(target_address=None):
+    """Set up SSH environment for connecting to the Pepper robot."""
+    print("SSH Environment Setup for Pepper Robot")
+    print("=" * 40)
+    
+    # Get target address if not provided
+    if not target_address:
+        current_ip = get_current_config_ip()
+        if current_ip:
+            print(f"Current configured address: {current_ip}")
+            use_current = input("Use current address? (Y/n): ").strip().lower()
+            if use_current != 'n':
+                target_address = current_ip
+        
+        if not target_address:
+            while True:
+                target_address = input("Enter robot IP address or hostname: ").strip()
+                if validate_ip_or_hostname(target_address):
+                    break
+                print("Invalid IP address or hostname format. Please try again.")
+    
+    print(f"\nSetting up SSH for: {target_address}")
+    
+    # Step 1: Generate SSH key if it doesn't exist
+    print("\n1. Checking SSH key...")
+    if os.path.exists(SSH_KEY_FILE):
+        print(f"✓ SSH key already exists: {SSH_KEY_FILE}")
+        overwrite = input("Key exists. Generate new key? (y/N): ").strip().lower()
+        if overwrite != 'y':
+            print("Using existing key.")
+        else:
+            generate_new_key = True
+    else:
+        print(f"SSH key not found: {SSH_KEY_FILE}")
+        generate_new_key = True
+    
+    if 'generate_new_key' in locals() and generate_new_key:
+        print("Generating new SSH key...")
+        try:
+            # Create .ssh directory if it doesn't exist
+            ssh_dir = os.path.dirname(SSH_KEY_FILE)
+            os.makedirs(ssh_dir, exist_ok=True)
+            os.chmod(ssh_dir, 0o700)
+            
+            # Generate SSH key
+            run_command([
+                'ssh-keygen', '-t', 'ed25519', '-f', SSH_KEY_FILE, 
+                '-C', 'haku-key', '-N', ''
+            ], capture_output=False)
+            
+            # Set proper permissions
+            os.chmod(SSH_KEY_FILE, 0o600)
+            os.chmod(f"{SSH_KEY_FILE}.pub", 0o644)
+            
+            print(f"✓ SSH key generated: {SSH_KEY_FILE}")
+        except Exception as e:
+            print(f"✗ Failed to generate SSH key: {e}")
+            return False
+    
+    # Step 2: Copy SSH key to robot
+    print("\n2. Copying SSH key to robot...")
+    print("You may be prompted for the robot's password (default: nao)")
+    
+    pub_key_file = f"{SSH_KEY_FILE}.pub"
+    if not os.path.exists(pub_key_file):
+        print(f"✗ Public key not found: {pub_key_file}")
+        return False
+    
+    try:
+        # Use ssh-copy-id to copy the key
+        run_command([
+            'ssh-copy-id', '-i', pub_key_file,
+            '-o', 'PubkeyAcceptedAlgorithms=+ssh-rsa',
+            f'{REMOTE_USER}@{target_address}'
+        ], capture_output=False)
+        
+        print("✓ SSH key copied to robot")
+    except Exception as e:
+        print(f"✗ Failed to copy SSH key: {e}")
+        print("\nYou can manually copy the key with:")
+        print(f"ssh-copy-id -i {pub_key_file} -o PubkeyAcceptedAlgorithms=+ssh-rsa {REMOTE_USER}@{target_address}")
+        return False
+    
+    # Step 3: Update SSH config
+    print("\n3. Updating SSH configuration...")
+    update_ssh_config(target_address)
+    
+    # Step 4: Test connection
+    print("\n4. Testing connection...")
+    if test_connection(HOST_NAME):
+        print("\n✓ SSH setup completed successfully!")
+        print(f"You can now connect with: ssh {HOST_NAME}")
+        print(f"Or sync files with: ./haku_sync")
+        return True
+    else:
+        print("\n✗ Connection test failed. Please check:")
+        print("- Robot is powered on and connected to network")
+        print("- IP address/hostname is correct")
+        print("- Robot SSH service is running")
+        return False
+
+def test_connection(target):
+    """Test SSH connection to the target."""
+    print(f"Testing connection to {target}...")
+    try:
+        result = subprocess.run([
+            'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes',
+            target, 'exit'
+        ], capture_output=True, timeout=15)
+        
+        if result.returncode == 0:
+            print("✓ Connection successful!")
+            return True
+        else:
+            print("✗ Connection failed!")
+            return False
+    except subprocess.TimeoutExpired:
+        print("✗ Connection timed out!")
+        return False
+
+def sync_files(target, sync_html=False, sync_hands_above_head=False, sync_media=False, delete_remote=False, use_scp=False):
+    """Sync files to the pepper robot."""
+    
+    # Check if rsync is available and decide which method to use
+    rsync_available = check_rsync_available()
+    if use_scp:
+        print("Using scp for file transfer (as requested)")
+        use_rsync = False
+    elif not rsync_available:
+        print("rsync not found, falling back to scp")
+        use_rsync = False
+    else:
+        print("Using rsync for file transfer")
+        use_rsync = True
+    
     if delete_remote:
         try:
-            """Remove the existing folder on the remote system."""
-            remove_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'rm -rf {REMOTE_FOLDER}'"
-            run_command(remove_command)
+            print("Removing existing remote folder...")
+            run_command(['ssh', target, f'rm -rf {REMOTE_FOLDER}'], capture_output=True)
         except Exception as e:
             print(f"Failed to remove remote folder: {e}")
-
+    
     try:
-        # Copy the local folder to the remote system
-        copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_FOLDER}"
-        run_command(copy_command)
+        print("Syncing main source folder...")
+        
+        if use_rsync:
+            if sync_media:
+                # Copy everything including media using rsync
+                run_command(['rsync', '-av', f'{LOCAL_FOLDER}/', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
+            else:
+                # Copy everything except the media folder using rsync
+                run_command(['rsync', '-av', '--exclude=media', f'{LOCAL_FOLDER}/', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
+        else:
+            # Using scp
+            if sync_media:
+                # Copy the entire local folder including media
+                run_command(['scp', '-r', f'{LOCAL_FOLDER}/.', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
+            else:
+                # Copy everything except the media folder using scp
+                # First create a temporary directory without media
+                import tempfile
+                import shutil
+                
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    temp_src = os.path.join(temp_dir, 'src')
+                    shutil.copytree(LOCAL_FOLDER, temp_src, ignore=shutil.ignore_patterns('media'))
+                    run_command(['scp', '-r', f'{temp_src}/.', f'{target}:{REMOTE_FOLDER}'], capture_output=False)
+        
+        if sync_media:
+            print("✓ Main folder sync completed (including media)")
+        else:
+            print("✓ Main folder sync completed (excluding media)")
+            
     except Exception as e:
         print(f"Failed to copy local folder to remote system: {e}")
-
-    if sync_html:
+        return False
+    
+    if sync_html and HTML_FILES:
         try:
+            print("Syncing HTML files...")
             # Create the remote directory if it does not exist
-            create_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p {HTML_REMOTE_PATH}'"
-            run_command(create_dir_command)
-
-            # Copy all .html files to the remote system
+            run_command(['ssh', target, f'mkdir -p {HTML_REMOTE_PATH}'], capture_output=True)
+            
+            # Copy all .html files to the remote system - show progress
             for html_file in HTML_FILES:
-                html_copy_command = f"sshpass -f {PASSWORD_FILE} scp {html_file} {REMOTE_USER}@{remote_ip}:{HTML_REMOTE_PATH}"
-                run_command(html_copy_command)
+                run_command(['scp', html_file, f'{target}:{HTML_REMOTE_PATH}'], capture_output=False)
+            print("✓ HTML files sync completed")
         except Exception as e:
             print(f"Failed to copy HTML files: {e}")
-
-    if sync_media:
+    
+    if sync_hands_above_head and os.path.exists(LOCAL_HANDS_ABOVE_HEAD_FOLDER):
         try:
-            # Create the remote media directory if it does not exist
-            create_media_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p {REMOTE_MEDIA_FOLDER}'"
-            run_command(create_media_dir_command)
-
-            # Copy the local media folder to the remote system
-            media_copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_MEDIA_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_MEDIA_FOLDER}"
-            run_command(media_copy_command)
-        except Exception as e:
-            print(f"Failed to copy media folder: {e}")
-
-    if sync_hands_above_head:
-        try:
+            print("Syncing hands above head behavior...")
             # Create the remote hands_above_head directory if it does not exist
-            create_hands_above_head_dir_command = f"sshpass -f {PASSWORD_FILE} ssh {REMOTE_USER}@{remote_ip} 'mkdir -p {REMOTE_HANDS_ABOVE_HEAD_FOLDER}'"
-            run_command(create_hands_above_head_dir_command)
-
-            # Copy the local hands_above_head folder to the remote system
-            hands_above_head_copy_command = f"sshpass -f {PASSWORD_FILE} scp -r {LOCAL_HANDS_ABOVE_HEAD_FOLDER}/. {REMOTE_USER}@{remote_ip}:{REMOTE_HANDS_ABOVE_HEAD_FOLDER}"
-            run_command(hands_above_head_copy_command)
+            run_command(['ssh', target, f'mkdir -p {REMOTE_HANDS_ABOVE_HEAD_FOLDER}'], capture_output=True)
+            
+            # Copy the local hands_above_head folder to the remote system - show progress
+            run_command(['scp', '-r', f'{LOCAL_HANDS_ABOVE_HEAD_FOLDER}/.', f'{target}:{REMOTE_HANDS_ABOVE_HEAD_FOLDER}'], capture_output=False)
+            print("✓ Hands above head behavior sync completed")
         except Exception as e:
             print(f"Failed to copy hands_above_head folder: {e}")
+    
+    return True
 
 def main():
     """Main function to handle command line arguments and initiate file sync."""
-    parser = argparse.ArgumentParser(description="Sync files to Pepper robot")
+    parser = argparse.ArgumentParser(
+        description="Sync files to Pepper robot using SSH keys",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --setup                  # Set up SSH environment for first time use
+  %(prog)s --setup 192.168.1.50     # Set up SSH for specific IP
+  %(prog)s                          # Sync to current SSH config
+  %(prog)s 192.168.1.50             # Sync to specific IP
+  %(prog)s --hostname               # Sync to haku.local
+  %(prog)s --hostname haku.local    # Sync to specific hostname
+  %(prog)s --all                    # Sync everything including media (no confirmation)
+  %(prog)s -H -b                    # Sync HTML and hands-above-head behavior
+  %(prog)s --set-ip 10.0.0.5        # Set IP in SSH config
+  %(prog)s --set-ip                 # Set IP interactively
+  %(prog)s --use-scp                # Force use of scp instead of rsync
+        """
+    )
     
-    parser.add_argument("ip", nargs="?", default=DEFAULT_IP, 
-                       help=f"Remote IP address (default: {DEFAULT_IP})")
-    parser.add_argument("-H", "--html", action="store_true", 
+    parser.add_argument("ip", nargs="?", default=None,
+                       help=f"Remote IP address (default: use SSH config or {DEFAULT_IP})")
+    
+    # Add hostname argument
+    parser.add_argument("--hostname", nargs="?", const=DEFAULT_HOSTNAME, default=None,
+                       help=f"Use hostname instead of SSH config (default: {DEFAULT_HOSTNAME})")
+    
+    # Sync options (media is now opt-in due to large files)
+    parser.add_argument("-H", "--html", action="store_true",
                        help="Sync HTML files")
-    parser.add_argument("-b", "--hands-above-head", action="store_true", 
+    parser.add_argument("-b", "--hands-above-head", action="store_true",
                        help="Sync hands above head behavior")
-    parser.add_argument("-m", "--media", action="store_true", 
-                       help="Sync media folder")
-    parser.add_argument("-a", "--all", action="store_true", 
-                       help="Sync all optional components (HTML, hands above head, media)")
-    parser.add_argument("-d", "--delete", action="store_true", 
+    parser.add_argument("-m", "--media", action="store_true",
+                       help="Sync media folder (large files - opt-in only)")
+    parser.add_argument("-a", "--all", action="store_true",
+                       help="Sync all components including media (HTML, hands above head, media)")
+    
+    # Other options
+    parser.add_argument("-d", "--delete", action="store_true",
                        help="Delete remote folder before syncing")
+    parser.add_argument("--use-ip", action="store_true",
+                       help="Use direct IP instead of SSH config alias")
+    parser.add_argument("--set-ip", action="store_true",
+                       help="Set IP address in SSH config (interactive mode)")
+    parser.add_argument("--setup", action="store_true",
+                       help="Set up SSH environment (generate keys, copy to robot, configure SSH)")
+    parser.add_argument("--use-scp", action="store_true",
+                       help="Force use of scp instead of rsync for file transfer")
     
     args = parser.parse_args()
+    
+    # Handle --set-ip mode
+    if args.set_ip:
+        if args.ip:
+            set_pepper_ip(args.ip)
+        else:
+            set_pepper_ip()
+        return
+    
+    # Handle --setup mode
+    if args.setup:
+        if args.ip:
+            setup_ssh_environment(args.ip)
+        else:
+            setup_ssh_environment()
+        return
+    
+    # Validate that only one connection method is specified
+    connection_methods = sum([bool(args.ip), bool(args.hostname)])
+    if connection_methods > 1:
+        print("Error: Please specify only one connection method (IP address or hostname)")
+        sys.exit(1)
+    
+    # Determine target (IP, hostname, or SSH alias)
+    if args.hostname:
+        # Use hostname
+        target = f"{REMOTE_USER}@{args.hostname}"
+        print(f"Using hostname: {args.hostname}")
+        print("⚠️  WARNING: Using hostname directly may be slower than IP address or SSH config!")
+    elif args.ip:
+        # Use IP address
+        if not validate_ip_or_hostname(args.ip):
+            print(f"Error: Invalid IP address format: {args.ip}")
+            sys.exit(1)
+        
+        target_ip = args.ip
+        current_config_ip = get_current_config_ip()
+        
+        # Check if IP is different from config and prompt to update
+        if current_config_ip and current_config_ip != target_ip:
+            print(f"Current SSH config IP: {current_config_ip}")
+            print(f"Specified IP: {target_ip}")
+            response = input("IP addresses differ. Update SSH config? (y/N): ")
+            if response.lower() == 'y':
+                update_ssh_config(target_ip)
+        elif not current_config_ip:
+            response = input(f"No SSH config found. Create config for {target_ip}? (y/N): ")
+            if response.lower() == 'y':
+                update_ssh_config(target_ip)
+        
+        # Choose target based on use_ip flag
+        target = f"{REMOTE_USER}@{target_ip}" if args.use_ip else HOST_NAME
+        
+        # Test that SSH config works if we're supposed to use it
+        if not args.use_ip and not test_connection(HOST_NAME):
+            print("SSH config connection failed, falling back to direct IP")
+            target = f"{REMOTE_USER}@{target_ip}"
+    else:
+        # No IP or hostname provided, try SSH config first, then hostname, then default IP
+        if test_connection(HOST_NAME):
+            target = HOST_NAME
+            print(f"Using SSH config: {HOST_NAME}")
+        elif test_connection(f"{REMOTE_USER}@{DEFAULT_HOSTNAME}"):
+            target = f"{REMOTE_USER}@{DEFAULT_HOSTNAME}"
+            print(f"SSH config not available, using hostname: {DEFAULT_HOSTNAME}")
+        else:
+            target = f"{REMOTE_USER}@{DEFAULT_IP}"
+            print(f"SSH config and hostname not available, using default IP: {DEFAULT_IP}")
     
     # If --all is specified, enable all sync options
     if args.all:
@@ -110,14 +613,43 @@ def main():
         args.hands_above_head = True
         args.media = True
     
-    print(f"Using remote IP: {args.ip}")
+    # Display sync configuration
+    print(f"\n=== Pepper Robot Sync Configuration ===")
+    print(f"Target: {target}")
+    print(f"Transfer Method: {'scp' if args.use_scp or not check_rsync_available() else 'rsync'}")
     print(f"Sync HTML: {args.html}")
     print(f"Sync Hands Above Head: {args.hands_above_head}")
     print(f"Sync Media: {args.media}")
     print(f"Delete Remote Folder: {args.delete}")
+    print("=" * 40)
     
-    sync_files(args.ip, args.html, args.hands_above_head, args.media, args.delete)
-    print("Sync completed.")
-
+    # Warn about media sync (only if not using --all)
+    if args.media and not args.all:
+        print("\n⚠️  WARNING: Media sync enabled - this may take a long time due to large files!")
+    
+    # Perform sync
+    success = sync_files(target, args.html, args.hands_above_head, args.media, args.delete, args.use_scp)
+    
+    if success:
+        print("\n✓ Sync completed successfully!")
+    else:
+        print("\n✗ Sync failed!")
+        sys.exit(1)
 if __name__ == "__main__":
-    main()
+    # Check if script is being called as set-pepper-ip
+    if len(sys.argv) > 0 and 'set-pepper-ip' in sys.argv[0]:
+        # Running as set-pepper-ip script
+        if len(sys.argv) > 1:
+            set_pepper_ip(sys.argv[1])
+        else:
+            set_pepper_ip()
+    else:
+        # Running as pepper_sync
+        try:
+            main()
+        # catch keyboard interrupt to exit gracefully
+        except KeyboardInterrupt:
+            print("\nExiting...")
+            sys.exit(0)
+        except Exception as e:
+            print(f"Error occurred in main: {e}")

@@ -2,6 +2,7 @@ import json
 import random
 import re
 from naoqi import ALProxy, ALModule
+import logger
 
 class BehaviourExecutor(ALModule):
     def __init__(self, name, behaviours_file, sounds_file, nao_ip, nao_port):
@@ -20,7 +21,7 @@ class BehaviourExecutor(ALModule):
         self.response_speed = self.DEFAULT_RESPONSE_SPEED
         self.response_speed_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
         
-        self.DEFAULT_SENTENCE_PAUSE_DURATION = 5
+        self.DEFAULT_SENTENCE_PAUSE_DURATION = 2
         self.sentence_pause_duration = self.DEFAULT_SENTENCE_PAUSE_DURATION
         self.sentence_pause_string = "\\\\wait=" + str(self.sentence_pause_duration) + "\\\\"
         
@@ -38,8 +39,22 @@ class BehaviourExecutor(ALModule):
         self.memory.subscribeToEvent("ControlContextMovement", name, "on_control_tracking_mode")
         self.memory.subscribeToEvent("ControlEngagement", name, "on_control_engagement_mode")
         self.memory.subscribeToEvent("ControlAwareness", name, "on_control_basic_awareness")
+        self.memory.subscribeToEvent("StopAction", name, "stop_behaviour")
+        self.memory.subscribeToEvent("StopBehaviour", name, "stop_behaviour")
         
         self.led_service = ALProxy('ALLeds')
+        
+        # Pre-create and cache proxy instances to avoid thread spawning during stop operations
+        try:
+            self.behavior_manager_proxy = ALProxy("ALBehaviorManager", self.nao_ip, self.nao_port)
+            self.animation_player_proxy = ALProxy("ALAnimationPlayer", self.nao_ip, self.nao_port)
+            self.audio_player_proxy = ALProxy("ALAudioPlayer", self.nao_ip, self.nao_port)
+            logger.debug("Pre-created behavior management proxies")
+        except Exception as e:
+            logger.warning("Could not pre-create some proxy instances:", e)
+            self.behavior_manager_proxy = None
+            self.animation_player_proxy = None
+            self.audio_player_proxy = None
         
         with open(self.behaviours_file, 'r') as file:
             self.behaviours = json.load(file)
@@ -47,7 +62,49 @@ class BehaviourExecutor(ALModule):
         with open(self.sounds_file, 'r') as file:
             self.sounds = json.load(file)
 
-    def sanitize_behaviour_requests(self, chat_response):
+    def stop_behaviour(self, event_name, value):
+        """Handle StopBehaviour events to stop all behaviors"""
+        logger.info("StopBehaviour received - stopping all behaviors")
+        try:
+            # Stop any running behaviors using cached proxy
+            self.memory.raiseEvent("RunningBehaviour", False)
+            if self.behavior_manager_proxy:
+                self.behavior_manager_proxy.stopAllBehaviors()
+            else:
+                # Fallback to creating proxy if pre-creation failed
+                bhv_manager = ALProxy("ALBehaviorManager")
+                bhv_manager.stopAllBehaviors()
+        except Exception as e:
+            logger.error("Error stopping behaviors:", e)
+
+    def __del__(self):
+        """Enhanced destructor that handles all cleanup gracefully"""
+        logger.info("cleaning everything")
+        
+        try:
+            # Unsubscribe from events if memory is still available
+            try:
+                if hasattr(self, 'memory'):
+                    self.memory.unsubscribe("Sound", self.getName())
+                    self.memory.unsubscribe("EyeColour", self.getName())
+                    self.memory.unsubscribe("EyeColourHold", self.getName())
+                    self.memory.unsubscribe("Mute", self.getName())
+                    self.memory.unsubscribe("Volume", self.getName())
+                    self.memory.unsubscribe("ChangeResponseSpeed", self.getName())
+                    self.memory.unsubscribe("ChangeSentencePause", self.getName())
+                    self.memory.unsubscribe("ControlContextMovement", self.getName())
+                    self.memory.unsubscribe("ControlEngagement", self.getName())
+                    self.memory.unsubscribe("ControlAwareness", self.getName())
+                    self.memory.unsubscribe("StopAction", self.getName())
+            except Exception as e:
+                logger.warning("Could not unsubscribe from expression events:", e)
+                
+        except Exception as e:
+            logger.error("Error during BehaviourExecutor cleanup:", e)
+        finally:
+            logger.info("cleaned up!")
+
+    def sanitise_behaviour_requests(self, chat_response):
         keyword_to_behaviour = {}
         behaviour_triggered = [False]
 
@@ -64,9 +121,9 @@ class BehaviourExecutor(ALModule):
                     return match.group(0)
             return "^{}({})".format(match.group(1), keyword_to_behaviour[keyword])
 
-        sanitized_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, chat_response)
+        sanitised_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, chat_response)
         spoken_response = re.sub(r'\^(start|wait|stop|run)\([^\)]*\)', '', chat_response).strip()
-        return sanitized_response, behaviour_triggered[0], spoken_response
+        return sanitised_response, behaviour_triggered[0], spoken_response
 
     def on_eye_colour_hold(self, _, value):
         self.set_eye_colour(value)
@@ -108,57 +165,69 @@ class BehaviourExecutor(ALModule):
         sound = next((s for s in self.sounds if s['audio_key'] == sound_key), None)
         if sound:
             selected_sound = random.choice(sound['audio_variations'])
-            print("Playing sound: {}".format(selected_sound))
+            logger.info("Playing sound:", selected_sound)
             
             try:
-                audio_player_service = ALProxy("ALAudioPlayer", self.nao_ip, self.nao_port)
-                audio_player_service.playFile(str(selected_sound), 1.0, 0.0)
+                if self.audio_player_proxy:
+                    self.audio_player_proxy.playFile(str(selected_sound), 1.0, 0.0)
+                else:
+                    # Fallback to creating proxy if pre-creation failed
+                    audio_player_service = ALProxy("ALAudioPlayer", self.nao_ip, self.nao_port)
+                    audio_player_service.playFile(str(selected_sound), 1.0, 0.0)
                 return selected_sound
             except Exception as e:
-                print("Error playing sound: {}".format(e))
+                logger.error("Error playing sound:", e)
         else:
-            print("No sound found for key: '{}'".format(sound_key))
+            logger.warning("No sound found for key:", sound_key)
         return
 
-    def sanitize_sound_requests(self, chat_response, play_sound=True):
+    def sanitise_sound_requests(self, chat_response, play_sound=True):
         def replace_keyword(match):
             keyword = match.group(1)
             if play_sound:
                 self.play_sound(keyword)
             return ''
 
-        sanitized_response = re.sub(r'\*\*audio=(.*?)\*\*', replace_keyword, chat_response)
-        return sanitized_response
+        sanitised_response = re.sub(r'\*\*audio=(.*?)\*\*', replace_keyword, chat_response)
+        return sanitised_response
 
-    def sanitize_request(self, chat_response):
-        print("Received chat response: {}".format(chat_response))
+    def sanitise_request(self, chat_response, add_speed_controls=True):
+        logger.info("Received chat response:", chat_response)
         
-        sanitized_response, behaviour_triggered, spoken_response = self.sanitize_behaviour_requests(chat_response)
-        sanitized_response = self.sanitize_sound_requests(sanitized_response)
-        spoken_response = self.sanitize_sound_requests(spoken_response, play_sound=False)
-        spoken_response = self.response_string + spoken_response
-        sanitized_response = self.response_string + sanitized_response
-        print("Sanitized response: {}".format(sanitized_response))
-        print("Spoken response: {}".format(spoken_response))
-        return sanitized_response, behaviour_triggered, spoken_response
+        sanitised_response, behaviour_triggered, spoken_response = self.sanitise_behaviour_requests(chat_response)
+        sanitised_response = self.sanitise_sound_requests(sanitised_response)
+        spoken_response = self.sanitise_sound_requests(spoken_response, play_sound=False)
+        
+        # Only add response speed/wait controls if explicitly requested
+        if add_speed_controls:
+            spoken_response = self.response_string + spoken_response
+            sanitised_response = self.response_string + sanitised_response
+        
+        logger.info("sanitised response:", sanitised_response)
+        logger.info("Spoken response:", spoken_response)
+        return sanitised_response, behaviour_triggered, spoken_response
 
     def execute_behaviour(self, behaviour_key):
         behaviour = next((b for b in self.behaviours if b['behaviour_key'] == behaviour_key), None)
         if behaviour:
             selected_behaviour = random.choice(behaviour['behaviour_variations'])
-            print("Executing behaviour: {}".format(selected_behaviour))
+            logger.info("Executing behaviour:", selected_behaviour)
             
             if not isinstance(selected_behaviour, str):
                 selected_behaviour = str(selected_behaviour)
 
             try:
-                animation_player_service = ALProxy("ALAnimationPlayer", self.nao_ip, self.nao_port)
-                animation_player_service.run(selected_behaviour, _async=True)
+                if self.animation_player_proxy:
+                    self.animation_player_proxy.run(selected_behaviour, _async=True)
+                else:
+                    # Fallback to creating proxy if pre-creation failed
+                    animation_player_service = ALProxy("ALAnimationPlayer", self.nao_ip, self.nao_port)
+                    animation_player_service.run(selected_behaviour, _async=True)
                 return selected_behaviour
             except Exception as e:
-                print("Error executing behaviour: {}".format(e))
+                logger.error("Error executing behaviour:", e)
         else:
-            print("No behaviour found for key: '{}'".format(behaviour_key))
+            logger.warning("No behaviour found for key:", behaviour_key)
         return None
     
     def execute_random_behaviour(self, behaviour_keys):
@@ -172,7 +241,7 @@ class BehaviourExecutor(ALModule):
                     self.behaviours[current_index]['action_description'] = description
                     with open(self.behaviours_file, 'w') as file:
                         json.dump(self.behaviours, file, indent=4)
-                    print("Updated behaviour at index {} with description: {}".format(current_index, description))
+                    logger.info("Updated behaviour at index", current_index, "with description:", description)
 
         if index > 0 and self.behaviours[index - 1].get('action_description', "<NO DESCRIPTION>") == "<NO DESCRIPTION>":
             update_behaviour_description(index - 1, previous_bhv_description)
@@ -182,7 +251,7 @@ class BehaviourExecutor(ALModule):
             if behaviour.get('action_description', "<NO DESCRIPTION>") == "<NO DESCRIPTION>":
                 return "{} ^run({})".format(behaviour['behaviour_key'], behaviour['behaviour_key']), index + 1
             else:
-                print("Skipped: {}".format(behaviour['action_description']))
+                logger.info("Skipped:", behaviour['action_description'])
             index += 1
 
         return None, index
@@ -191,14 +260,14 @@ class BehaviourExecutor(ALModule):
         self.current_volume = value
         audio = ALProxy( "ALAudioDevice")
         audio.setOutputVolume(self.current_volume)
-        print("INF: SpeechRecognitionModule: volume set to %s" % self.current_volume)
+        logger.info("SpeechRecognitionModule: volume set to", self.current_volume)
 
     def on_mute(self, _, value):
         self.mute = value
         if value:
             audio = ALProxy( "ALAudioDevice")
             audio.setOutputVolume(0)
-            print("INF: SpeechRecognitionModule: volume set to 0")
+            logger.info("SpeechRecognitionModule: volume set to 0")
         else:
             self.volume(None, self.current_volume)
 
@@ -206,27 +275,53 @@ class BehaviourExecutor(ALModule):
         self.response_speed = value
         self.response_speed_string = "\\\\rspd=" + str(self.response_speed) + "\\\\"
         self.response_string = self.response_speed_string + self.sentence_pause_string
-        print("INF: GreetingsModule: Response speed changed to {}".format(value))
+        logger.info("GreetingsModule: Response speed changed to", value)
     
     def on_sentence_pause_change(self, event_name, value):
         self.sentence_pause_duration = value
         self.sentence_pause_string = "\\\\wait=" + str(self.sentence_pause_duration) + "\\\\"
         self.response_string = self.response_speed_string + self.sentence_pause_string
-        print("INF: GreetingsModule: Sentence pause duration changed to {}".format(value))
+        logger.info("GreetingsModule: Sentence pause duration changed to", value)
     
     def on_control_basic_awareness(self, event_name, value):
-        print("Control basic awareness: {}".format(value))
+        logger.info("Control basic awareness:", value)
         aba = ALProxy("ALBasicAwareness")
         aba.setEnabled(value)
     
     def on_control_engagement_mode(self, event_name, value):
         aba = ALProxy("ALBasicAwareness")
         mode = "FullyEngaged" if value else "Unengaged"
-        print("Control engagement mode: {}".format(mode))
+        logger.info("Control engagement mode:", mode)
         aba.setEngagementMode(mode)
 
     def on_control_tracking_mode(self, event_name, value):
         aba = ALProxy("ALBasicAwareness")
         mode = "MoveContextually" if value else "WholeBody"
-        print("Control tracking mode: {}".format(mode))
+        logger.info("Control tracking mode:", mode)
         aba.setTrackingMode(mode)
+
+    def stop(self):
+        """Stop the expressions module and clean up"""
+        try:
+            # Unsubscribe from events
+            try:
+                if hasattr(self, 'memory'):
+                    self.memory.unsubscribe("Sound", self.getName())
+                    self.memory.unsubscribe("EyeColour", self.getName())
+                    self.memory.unsubscribe("EyeColourHold", self.getName())
+                    self.memory.unsubscribe("Mute", self.getName())
+                    self.memory.unsubscribe("Volume", self.getName())
+                    self.memory.unsubscribe("ChangeResponseSpeed", self.getName())
+                    self.memory.unsubscribe("ChangeSentencePause", self.getName())
+                    self.memory.unsubscribe("ControlContextMovement", self.getName())
+                    self.memory.unsubscribe("ControlEngagement", self.getName())
+                    self.memory.unsubscribe("ControlAwareness", self.getName())
+                    self.memory.unsubscribe("StopAction", self.getName())
+                    self.memory.unsubscribe("StopBehaviour", self.getName())
+            except Exception as e:
+                logger.warning("Could not unsubscribe from expression events:", e)
+                
+        except Exception as e:
+            logger.error("Error during BehaviourExecutor stop:", e)
+        finally:
+            logger.info("stopped!")

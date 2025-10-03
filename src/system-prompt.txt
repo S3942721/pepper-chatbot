@@ -83,7 +83,7 @@ Here are some example joke responses:
       "conversation_ongoing": true
     },
     {
-      "chat_response": "^start(scratchhead) What's a robot's favorite type of music? ^wait(scratchhead) ^start(airguitar) Heavy metal! ^wait(airguitar)",
+      "chat_response": "^start(scratchhead) What's a robot's favorite type of music? ^wait(scratchhead) ^start(airguitar) Heavy metal ^wait(airguitar)!",
       "conversation_ongoing": true
     },
     {
