@@ -4,7 +4,8 @@
         "behaviour_key": "airguitar", 
         "behaviour_variations": [
             "animations/Stand/Waiting/AirGuitar_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "leans foward and looks dazed", 
@@ -35,7 +36,8 @@
         "behaviour_key": "bandmaster", 
         "behaviour_variations": [
             "animations/Stand/Waiting/Bandmaster_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "puts his hands up to his eyes and moves them like using binoculars", 
@@ -186,14 +188,16 @@
         "behaviour_key": "drink", 
         "behaviour_variations": [
             "animations/Stand/Waiting/Drink_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "pretends to drive a car, and crashes it, this is a funny action", 
         "behaviour_key": "drivecar", 
         "behaviour_variations": [
             "animations/Stand/Waiting/DriveCar_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "twiddles his thumbs and looks down", 
@@ -238,7 +242,8 @@
         "behaviour_key": "clap", 
         "behaviour_variations": [
             "animations/Stand/Emotions/Positive/Excited_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "gestures confused and wants an explanation", 
@@ -271,7 +276,8 @@
             "animations/Stand/Waiting/Fitness_1", 
             "animations/Stand/Waiting/Fitness_3", 
             "animations/Stand/Waiting/Fitness_2"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "gestures for people to follow him", 
@@ -285,7 +291,8 @@
         "behaviour_key": "funnydancer", 
         "behaviour_variations": [
             "animations/Stand/Waiting/FunnyDancer_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "gestures for something to come to him", 
@@ -322,14 +329,16 @@
         "behaviour_key": "happybirthday", 
         "behaviour_variations": [
             "animations/Stand/Waiting/HappyBirthday_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "looks at and is distracted by a passing helicopter, this is funny", 
         "behaviour_key": "helicopter", 
         "behaviour_variations": [
             "animations/Stand/Waiting/Helicopter_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "This is a long behaviour, pepper repeatedly is about to wave but stops just before doing it", 
@@ -429,14 +438,16 @@
         "behaviour_key": "kisses", 
         "behaviour_variations": [
             "animations/Stand/Gestures/Kisses_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "pretends to be a knight and hold a sword, this is funny", 
         "behaviour_key": "knight", 
         "behaviour_variations": [
             "animations/Stand/Waiting/Knight_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "pretends their eye is broken and knocks their head to fix it", 
@@ -549,14 +560,16 @@
         "behaviour_key": "monster", 
         "behaviour_variations": [
             "animations/Stand/Waiting/Monster_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "raises hands to the sky and plays mystical music as if doing magic, this can be funny", 
         "behaviour_key": "mysticalpower", 
         "behaviour_variations": [
             "animations/Stand/Waiting/MysticalPower_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "getsures for the next of something", 
@@ -709,7 +722,8 @@
         "behaviour_key": "scratcheye", 
         "behaviour_variations": [
             "animations/Stand/Waiting/ScratchEye_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "scratches his hand", 
@@ -757,7 +771,8 @@
             "animations/Stand/Waiting/ShowMuscles_1", 
             "animations/Stand/Waiting/ShowMuscles_4", 
             "animations/Stand/Waiting/ShowMuscles_2"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "points to the sky", 
@@ -797,7 +812,8 @@
         "behaviour_key": "spaceshuttle", 
         "behaviour_variations": [
             "animations/Stand/Waiting/SpaceShuttle_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "stretches out", 
@@ -813,7 +829,8 @@
         "behaviour_key": "strikeapose",
         "behaviour_variations": [
             "hands_above_head/behavior_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "shakes head as if dissagreeing and not changing something", 
@@ -957,7 +974,8 @@
         "behaviour_key": "wakeup", 
         "behaviour_variations": [
             "animations/Stand/Waiting/WakeUp_1"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "points to something as if to ask about it", 
@@ -989,7 +1007,8 @@
             "animations/Stand/Gestures/Wings_4", 
             "animations/Stand/Gestures/Wings_5", 
             "animations/Stand/Gestures/Wings_2"
-        ]
+        ],
+        "must_complete": true
     }, 
     {
         "action_description": "agrees with a nod or other positive gesture", 
@@ -1034,42 +1053,48 @@
         "behaviour_key": "zombie", 
         "behaviour_variations": [
             "animations/Stand/Waiting/Zombie_1"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "does a disco dance", 
         "behaviour_key": "disco", 
         "behaviour_variations": [
             "naoanimations-5e61c9/disco"
-        ]
+        ],
+        "must_complete": true
     },
     {
-        "action_description": "pretends to be an elephant", 
+        "action_description": "pretends to be an elephant, this is funny", 
         "behaviour_key": "elephant", 
         "behaviour_variations": [
             "naoanimations-5e61c9/elephant"
-        ]
+        ],
+        "must_complete": true
     },
     {
-        "action_description": "does a disco dance with music", 
+        "action_description": "does a disco dance with music, this is funny", 
         "behaviour_key": "disco_w_music", 
         "behaviour_variations": [
             "naoanimations-5e61c9/disco_w_music"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "pretends to play football", 
         "behaviour_key": "football", 
         "behaviour_variations": [
             "naoanimations-5e61c9/football"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "pretends to play golf", 
         "behaviour_key": "golf", 
         "behaviour_variations": [
             "naoanimations-5e61c9/golf"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "pretends to be a gorilla", 
@@ -1111,119 +1136,136 @@
         "behaviour_key": "dance_gangnamstyle", 
         "behaviour_variations": [
             "jgangnamstyle-d7ea26"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances to Dango Dango, this is a long dance that requires space", 
         "behaviour_key": "dance_dango", 
         "behaviour_variations": [
             "dango3kyodai-2e833b"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances to Dance of The Nights, this is a long dance that requires space", 
         "behaviour_key": "dance_of_the_nights", 
         "behaviour_variations": [
             "danceoftheknights-169092"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances a salsa dance, this is a long dance that requires space", 
         "behaviour_key": "dance_salsa_dancing", 
         "behaviour_variations": [
             "asereje-9e71b3"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances the nut cracker, this is a long dance that requires space", 
         "behaviour_key": "dance_nut_cracker", 
         "behaviour_variations": [
             "danceofthereedflutes-93ba8f"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances to Walk This Way, this is a long dance that requires space", 
         "behaviour_key": "dance_walk_this_way", 
         "behaviour_variations": [
             "walk_this_way-553cea"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "does a tai chi chuan move", 
         "behaviour_key": "taichichuan", 
         "behaviour_variations": [
             "naoanimations-5e61c9/taichichuan"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "pretends to vacuum", 
         "behaviour_key": "vacuum", 
         "behaviour_variations": [
             "naoanimations-5e61c9/vacuum"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances to Mika's Relax, this is a long dance that requires space", 
         "behaviour_key": "dance_mika_relax", 
         "behaviour_variations": [
             "mika_relax-2c3b38"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances to La Bamba, this is a long dance that requires space", 
         "behaviour_key": "dance_la_bamba", 
         "behaviour_variations": [
             "la_bamba-2bcabb"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances to Hungarian dance music, this is a long dance that requires space", 
         "behaviour_key": "dance_hungarian_full_default", 
         "behaviour_variations": [
             "hungarian-a7c2ea"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Dances to Hungarian dance music, this is a long dance that requires space", 
         "behaviour_key": "dance_hungarian_full", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/all_together"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 1 of Dance to Hungarian dance music", 
         "behaviour_key": "dance_hungarian_pt1", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt1"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 2 of Dance to Hungarian dance music", 
         "behaviour_key": "dance_hungarian_pt2", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt2"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 3 of Dance to Hungarian dance music", 
         "behaviour_key": "dance_hungarian_pt3", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt3"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 4 of Dance to Hungarian dance music", 
         "behaviour_key": "dance_hungarian_pt4", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt4"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 5 of Dance to Hungarian dance music", 
         "behaviour_key": "dance_hungarian_pt5", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt5"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 6 of Dance to Hungarian dance music", 
@@ -1237,48 +1279,55 @@
         "behaviour_key": "dance_hungarian_full_mute", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/all_together_mute"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 1 of Dance to Hungarian dance music muted", 
         "behaviour_key": "dance_hungarian_pt1_mute", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt1_mute"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 2 of Dance to Hungarian dance music muted", 
         "behaviour_key": "dance_hungarian_pt2_mute", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt2_mute"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 3 of Dance to Hungarian dance music muted", 
         "behaviour_key": "dance_hungarian_pt3_mute", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt3_mute"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 4 of Dance to Hungarian dance music muted", 
         "behaviour_key": "dance_hungarian_pt4_mute", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt4_mute"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 5 of Dance to Hungarian dance music muted", 
         "behaviour_key": "dance_hungarian_pt5_mute", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt5_mute"
-        ]
+        ],
+        "must_complete": true
     },
     {
         "action_description": "Pt 6 of Dance to Hungarian dance music muted", 
         "behaviour_key": "dance_hungarian_pt6_mute", 
         "behaviour_variations": [
             "hungarian_parts-4e01cb/pt6_mute"
-        ]
+        ],
+        "must_complete": true
     }
 ]
