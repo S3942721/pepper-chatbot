@@ -108,6 +108,9 @@ class BehaviourExecutor(ALModule):
         keyword_to_behaviour = {}
         behaviour_triggered = [False]
 
+        # First pass: add automatic ^wait() for behaviors with must_complete tag (before path conversion)
+        response_with_auto_waits = self._add_auto_waits(chat_response)
+
         def replace_keyword(match):
             keyword = match.group(2)
 
@@ -121,9 +124,79 @@ class BehaviourExecutor(ALModule):
                     return match.group(0)
             return "^{}({})".format(match.group(1), keyword_to_behaviour[keyword])
 
-        sanitised_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, chat_response)
+        # Second pass: replace keywords with actual behavior paths
+        sanitised_response = re.sub(r'\^(start|wait|stop|run)\((.*?)\)', replace_keyword, response_with_auto_waits)
+        
         spoken_response = re.sub(r'\^(start|wait|stop|run)\([^\)]*\)', '', chat_response).strip()
         return sanitised_response, behaviour_triggered[0], spoken_response
+
+    def _add_auto_waits(self, chat_response):
+        """
+        Add automatic ^wait() commands for behaviors with must_complete=true
+        that have ^start() but no corresponding ^wait() or ^stop()
+        Works with behavior keys before they are converted to full paths.
+        
+        Inserts ^wait() commands right before the next ^start() command,
+        or at the end if no subsequent ^start() exists.
+        """
+        # Find all behavior command positions and details
+        behavior_pattern = r'\^(start|wait|stop|run)\(([^)]+)\)'
+        matches = list(re.finditer(behavior_pattern, chat_response))
+        
+        if not matches:
+            return chat_response
+        
+        # Track behavior states
+        started_behaviors = {}  # behavior_key -> match object
+        completed_behaviors = set()  # behaviors that have wait or stop
+        
+        # First pass: identify started and completed behaviors
+        for match in matches:
+            command = match.group(1)
+            behavior_key = match.group(2)
+            
+            if command == 'start':
+                started_behaviors[behavior_key] = match
+            elif command in ['wait', 'stop']:
+                completed_behaviors.add(behavior_key)
+        
+        # Find behaviors that need auto-wait and where to insert them
+        insertions = []  # list of (position, text) tuples
+        
+        for behavior_key, start_match in started_behaviors.items():
+            if behavior_key not in completed_behaviors:
+                # Check if this behavior has must_complete=true
+                behavior = next((b for b in self.behaviours if b['behaviour_key'] == behavior_key), None)
+                if behavior and behavior.get('must_complete', False):
+                    # Find the next ^start() command after this one
+                    next_start_pos = None
+                    start_end = start_match.end()
+                    
+                    for match in matches:
+                        if match.group(1) == 'start' and match.start() > start_end:
+                            next_start_pos = match.start()
+                            break
+                    
+                    # Insert ^wait() before the next ^start(), or at the end
+                    if next_start_pos is not None:
+                        insertions.append((next_start_pos, " ^wait({}) ".format(behavior_key)))
+                    else:
+                        # No subsequent ^start(), add at the end
+                        insertions.append((len(chat_response), " ^wait({})".format(behavior_key)))
+                    
+                    logger.info("Auto-added ^wait({}) for must_complete behavior".format(behavior_key))
+        
+        # Sort insertions by position (reverse order to maintain correct positions)
+        insertions.sort(key=lambda x: x[0], reverse=True)
+        
+        # Apply insertions from right to left to maintain correct positions
+        result = chat_response
+        for position, text in insertions:
+            result = result[:position] + text + result[position:]
+        
+        return result
+
+
 
     def on_eye_colour_hold(self, _, value):
         self.set_eye_colour(value)

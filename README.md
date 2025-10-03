@@ -133,6 +133,15 @@ The system uses embedded behavior syntax in LLM responses:
 
 Example: `"Hello! ^start(hey) Nice to meet you. ^wait(hey)"`
 
+### Auto-Completion for Long Behaviors
+
+Behaviors with `must_complete: true` in their definition will automatically have `^wait()` added if they use `^start()` without a corresponding `^wait()` or `^stop()`:
+
+- Input: `"Hey there ^start(funnydancer) how are you?"`
+- Output: `"Hey there ^start(funnydancer) how are you? ^wait(funnydancer)"`
+
+This ensures long animations like dances and complex behaviors complete properly without being cut off.
+
 Available animations are defined in `src/robot_behaviours_described.json`.  
 ## System Output
 
