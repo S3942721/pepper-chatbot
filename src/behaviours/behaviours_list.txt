@@ -39,6 +39,7 @@
 "helicopter" - looks at and is distracted by a passing helicopter, this is funny
 "hesitation" - This is a long behaviour, pepper repeatedly is about to wave but stops just before doing it
 "hey" - does a wave, this works for both hello and goodbye
+"wave" - does a wave, this works for both hello and goodbye
 "hideeyes" - covers his eyes
 "hidehands" - puts his hands behind his back, this is a long behaviour
 "hot" - crouches down and pretends like he is hot and exhausted
@@ -53,6 +54,7 @@
 "kungfu" - does a quick kungfu pose
 "laugh" - laughs
 "quicklaugh" - laughs quickly
+"tinylaugh" - laughs quickly and cutely
 "listening" - leans in as if to listen
 "look" - looks to the ceiling and pretends to be thinking
 "lookhand" - looks at his hands as if to be discovering they are a robot, this can be funny
@@ -67,6 +69,8 @@
 "no" - shakes his head in disagreement
 "nothing" - gestures crossing arms
 "ontheevening" - does a small party like gesture
+"onehandup" - puts one hand up
+"twohandsup" - puts one hand up
 "playhands" - moves his hands around interstingly
 "please" - pleads
 "puzzled" - looks confused
@@ -99,7 +103,8 @@
 "takeplace" - gestures gestures for someone to take seat or take their place
 "taxi" - pretends to hail a taxi
 "think" - looks to be thinking
-"thinking" - looks to be thinking and scratches chin
+"thinking2" - looks to be thinking and scratches chin
+"thinking" - looks to be thinking and scratching head
 "this" - points to something infront of it
 "thoughtful" - looks to be thinking and caring
 "touchhead" - Pepepr touches his head
@@ -112,3 +117,38 @@
 "youknowwhat" - gestures in front as if to agree with what someone says interestingly
 "yum" - pats stomach as if eating or drinking something yum
 "zombie" - pretends to be a zombie, this can be funny, this is a long behaviour
+"disco" - does a disco dance
+"elephant" - pretends to be an elephant, this is funny
+"disco_w_music" - does a disco dance with music, this is funny
+"football" - pretends to play football
+"golf" - pretends to play golf
+"gorilla" - pretends to be a gorilla
+"headbang" - does a headbang
+"headbang_w_music" - does a headbang with music
+"mouse" - pretends to be a mouse
+"saxaphone" - pretends to play the saxophone
+"dance_gangnamstyle" - Dances to Gangnamstyle, this is a long dance that requires space
+"dance_dango" - Dances to Dango Dango, this is a long dance that requires space
+"dance_of_the_nights" - Dances to Dance of The Nights, this is a long dance that requires space
+"dance_salsa_dancing" - Dances a salsa dance, this is a long dance that requires space
+"dance_nut_cracker" - Dances the nut cracker, this is a long dance that requires space
+"dance_walk_this_way" - Dances to Walk This Way, this is a long dance that requires space
+"taichichuan" - does a tai chi chuan move
+"vacuum" - pretends to vacuum
+"dance_mika_relax" - Dances to Mika's Relax, this is a long dance that requires space
+"dance_la_bamba" - Dances to La Bamba, this is a long dance that requires space
+"dance_hungarian_full_default" - Dances to Hungarian dance music, this is a long dance that requires space
+"dance_hungarian_full" - Dances to Hungarian dance music, this is a long dance that requires space
+"dance_hungarian_pt1" - Pt 1 of Dance to Hungarian dance music
+"dance_hungarian_pt2" - Pt 2 of Dance to Hungarian dance music
+"dance_hungarian_pt3" - Pt 3 of Dance to Hungarian dance music
+"dance_hungarian_pt4" - Pt 4 of Dance to Hungarian dance music
+"dance_hungarian_pt5" - Pt 5 of Dance to Hungarian dance music
+"dance_hungarian_pt6" - Pt 6 of Dance to Hungarian dance music
+"dance_hungarian_full_mute" - Dances to Hungarian dance music muted, this is a long dance that requires space
+"dance_hungarian_pt1_mute" - Pt 1 of Dance to Hungarian dance music muted
+"dance_hungarian_pt2_mute" - Pt 2 of Dance to Hungarian dance music muted
+"dance_hungarian_pt3_mute" - Pt 3 of Dance to Hungarian dance music muted
+"dance_hungarian_pt4_mute" - Pt 4 of Dance to Hungarian dance music muted
+"dance_hungarian_pt5_mute" - Pt 5 of Dance to Hungarian dance music muted
+"dance_hungarian_pt6_mute" - Pt 6 of Dance to Hungarian dance music muted
