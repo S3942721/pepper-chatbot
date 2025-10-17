@@ -280,8 +280,16 @@ class BaseSpeechReceiverModule(ALModule):
             
             logger.info("Processing queued message - Signal:", signal_name, "Speech ID:", speech_id, "Queue remaining:", self.message_queue.qsize())
             
-            # Notify speaking manager about queue activity
-            self.memory.raiseEvent("DequeueResult", {"speech_id": speech_id})
+            # Notify speaking manager about queue activity. Include remaining queue size
+            # so the speaking manager can stay in sync with the real queue.
+            try:
+                remaining = self.message_queue.qsize()
+            except Exception:
+                remaining = None
+            payload = {"speech_id": speech_id}
+            if remaining is not None:
+                payload["queue_size"] = remaining
+            self.memory.raiseEvent("DequeueResult", payload)
             
             # Stop any current speech before starting new one
             if self.is_currently_speaking:

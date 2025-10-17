@@ -94,16 +94,28 @@ class SpeakingStateManager(ALModule):
     def on_dequeue_result(self, event_name, queue_info):
         """Handle speech being removed from queue"""
         with self._speaking_lock:
-            if self._pending_speech_count > 0:
-                self._pending_speech_count -= 1
-                logger.info("Speech dequeued, pending count:", self._pending_speech_count)
-                
+            # queue_info may include an updated queue_size from the producer
+            # prefer authoritative queue_size if present to avoid drift
+            try:
+                if isinstance(queue_info, dict) and 'queue_size' in queue_info:
+                    new_pending = int(queue_info.get('queue_size', 0))
+                    # Pending count should reflect the number of items remaining
+                    self._pending_speech_count = max(0, new_pending)
+                    logger.info("DequeueResult received, authoritative queue_size:", self._pending_speech_count)
+                else:
+                    # Backwards-compatible behavior: decrement by one
+                    if self._pending_speech_count > 0:
+                        self._pending_speech_count -= 1
+                        logger.info("Speech dequeued, pending count:", self._pending_speech_count)
+                    else:
+                        logger.warning("Received dequeue event but pending count was already 0")
+
                 # If no more pending speech and we're not currently speaking, ensure Speaking is False
                 if self._pending_speech_count == 0 and not self._speaking:
                     self.memory.raiseEvent("Speaking", False)
                     logger.info("Queue empty and not speaking, ensuring Speaking False")
-            else:
-                logger.warning("Received dequeue event but pending count was already 0")
+            except Exception as e:
+                logger.error("Error handling DequeueResult:", e)
 
     def on_speech_finished(self, event_name, value):
         """Handle end of animated speech"""
