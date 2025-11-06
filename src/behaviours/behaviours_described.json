@@ -705,6 +705,19 @@
     }, 
     {
         "action_description": "scratches", 
+        "behaviour_key": "scratch", 
+        "behaviour_variations": [
+            "animations/Stand/Waiting/ScratchBack_1",
+            "animations/Stand/Waiting/ScratchBottom_1",
+            "animations/Stand/Waiting/ScratchEye_1",
+            "animations/Stand/Waiting/ScratchHand_1",
+            "animations/Stand/Waiting/ScratchHead_1",
+            "animations/Stand/Waiting/ScratchLeg_1",
+            "animations/Stand/Waiting/ScratchTorso_1"
+        ]
+    }, 
+    {
+        "action_description": "scratches", 
         "behaviour_key": "scratchback", 
         "behaviour_variations": [
             "animations/Stand/Waiting/ScratchBack_1"
@@ -885,7 +898,7 @@
     }, 
     {
         "action_description": "looks to be thinking", 
-        "behaviour_key": "think", 
+        "behaviour_key": "think_ex", 
         "behaviour_variations": [
             "animations/Stand/Waiting/Think_3", 
             "animations/Stand/Waiting/Think_2", 
@@ -894,7 +907,7 @@
     }, 
     {
         "action_description": "looks to be thinking and scratches chin", 
-        "behaviour_key": "thinking2", 
+        "behaviour_key": "thinking_ex",
         "behaviour_variations": [
             "animations/Stand/Gestures/Thinking_2", 
             "animations/Stand/Gestures/Thinking_7", 
