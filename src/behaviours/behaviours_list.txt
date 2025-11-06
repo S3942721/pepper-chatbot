@@ -80,6 +80,7 @@
 "rest" - rests in a standing position
 "sad" - looks sad and sometimes pretends to cry
 "salute" - bows
+"scratch" - scratches
 "scratchback" - scratches
 "scratchbottom" - scratches his bottom
 "scratcheye" - scratches his eye this could work as if pepper got something in his eye, this could be funny if pepper pretended to get something in his eye
@@ -102,8 +103,8 @@
 "takepicture" - holds up a camera and takes a picture
 "takeplace" - gestures gestures for someone to take seat or take their place
 "taxi" - pretends to hail a taxi
-"think" - looks to be thinking
-"thinking2" - looks to be thinking and scratches chin
+"think_ex" - looks to be thinking
+"thinking_ex" - looks to be thinking and scratches chin
 "thinking" - looks to be thinking and scratching head
 "this" - points to something infront of it
 "thoughtful" - looks to be thinking and caring

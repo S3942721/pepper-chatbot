@@ -898,7 +898,7 @@
     }, 
     {
         "action_description": "looks to be thinking", 
-        "behaviour_key": "think", 
+        "behaviour_key": "think_ex", 
         "behaviour_variations": [
             "animations/Stand/Waiting/Think_3", 
             "animations/Stand/Waiting/Think_2", 
@@ -907,7 +907,7 @@
     }, 
     {
         "action_description": "looks to be thinking and scratches chin", 
-        "behaviour_key": "thinking2", 
+        "behaviour_key": "thinking_ex",
         "behaviour_variations": [
             "animations/Stand/Gestures/Thinking_2", 
             "animations/Stand/Gestures/Thinking_7", 
