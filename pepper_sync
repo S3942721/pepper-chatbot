@@ -635,6 +635,7 @@ Examples:
     else:
         print("\n✗ Sync failed!")
         sys.exit(1)
+
 if __name__ == "__main__":
     # Check if script is being called as set-pepper-ip
     if len(sys.argv) > 0 and 'set-pepper-ip' in sys.argv[0]:
