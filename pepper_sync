@@ -21,7 +21,8 @@ LOCAL_JSON_FILE = os.path.join(LOCAL_FOLDER, "robot_behaviours_described.json")
 REMOTE_EXPLORER_FOLDER = "~/.local/share/Explorer"
 LOCAL_EXPLORER_FOLDER = os.path.join(os.path.dirname(LOCAL_FOLDER), "explorer")
 LOCAL_MEDIA_FOLDER = os.path.join(os.path.dirname(LOCAL_FOLDER), "src/media")
-REMOTE_MEDIA_FOLDER = os.path.join(REMOTE_FOLDER, "media")
+REMOTE_MEDIA_FOLDER_WEB = HTML_REMOTE_PATH
+REMOTE_MEDIA_FOLDER_SRC = os.path.join(REMOTE_FOLDER, "media")
 LOCAL_HANDS_ABOVE_HEAD_FOLDER = os.path.join(LOCAL_FOLDER, "strikeapose/hands_above_head")
 REMOTE_HANDS_ABOVE_HEAD_FOLDER = "~/.local/share/PackageManager/apps/hands_above_head"
 
@@ -459,6 +460,25 @@ def sync_files(target, sync_html=False, sync_hands_above_head=False, sync_media=
     except Exception as e:
         print(f"Failed to copy local folder to remote system: {e}")
         return False
+    
+    # Sync media folder separately to REMOTE_MEDIA_FOLDER
+    if sync_media and os.path.exists(LOCAL_MEDIA_FOLDER):
+        try:
+            print("Syncing media folder...")
+            # Create the remote media directory if it does not exist
+            run_command(['ssh', target, f'mkdir -p {REMOTE_MEDIA_FOLDER_SRC}'], capture_output=True)
+            run_command(['ssh', target, f'mkdir -p {REMOTE_MEDIA_FOLDER_WEB}'], capture_output=True)
+            
+            # Copy media folder to the remote system - show progress
+            if use_rsync:
+                run_command(['rsync', '-av', f'{LOCAL_MEDIA_FOLDER}/', f'{target}:{REMOTE_MEDIA_FOLDER_SRC}'], capture_output=False)
+                run_command(['rsync', '-av', f'{LOCAL_MEDIA_FOLDER}/', f'{target}:{REMOTE_MEDIA_FOLDER_WEB}'], capture_output=False)
+            else:
+                run_command(['scp', '-r', f'{LOCAL_MEDIA_FOLDER}/.', f'{target}:{REMOTE_MEDIA_FOLDER_SRC}'], capture_output=False)
+                run_command(['scp', '-r', f'{LOCAL_MEDIA_FOLDER}/.', f'{target}:{REMOTE_MEDIA_FOLDER_WEB}'], capture_output=False)
+            print("✓ Media folder sync completed")
+        except Exception as e:
+            print(f"Failed to copy media folder: {e}")
     
     if sync_html and HTML_FILES:
         try:
