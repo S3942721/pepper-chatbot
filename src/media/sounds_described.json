@@ -120,5 +120,19 @@
         "audio_variations": [
             "/data/home/nao/pepperchat/media/teams-call.wav"
         ]
+    },
+    {
+        "audio_description": "Royal Trumpet Fanfare",
+        "audio_key": "royal_trumpet_fanfare",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/queen-royalty-trumpet.mp3"
+        ]
+    },
+    {
+        "audio_description": "Quick Trumpet Fanfare",
+        "audio_key": "quick_trumpet_fanfare",
+        "audio_variations": [
+            "/data/home/nao/pepperchat/media/trumpet-quick.wav"
+        ]
     }
 ]
