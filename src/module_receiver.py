@@ -42,12 +42,15 @@ class BaseSpeechReceiverModule(ALModule):
         self.queue_running = False
         self.queue_lock = threading.Lock()
         self.speech_counter = 0  # Counter for unique speech IDs
-        
+
         # Speaking state management
         self.is_currently_speaking = False
         self.speech_finished_event = threading.Event()
-        self.speech_timeout_timer = None  # Add timeout timer
+        self.speech_timeout_timer = None
         self.SPEECH_TIMEOUT = 30.0  # 30 second timeout for speech completion
+        # NAOqi task ID returned by post.say() - used for targeted stop()
+        # and passed to the speaking manager so it can correlate events
+        self.current_naoqi_task_id = None
 
         self.speech = ALProxy('ALAnimatedSpeech')
         
@@ -126,22 +129,22 @@ class BaseSpeechReceiverModule(ALModule):
             logger.info("cleaned up!")
 
     def finished_speaking(self, _, value):
-        logger.info("Speech finished event received for value:", value)
-        
-        # Log the raw event details for debugging
-        logger.info("ALAnimatedSpeech/EndOfAnimatedSpeech event - Raw value:", repr(value))
-        
-        # Cancel the timeout timer
+        logger.info("ALAnimatedSpeech/EndOfAnimatedSpeech event - value:", repr(value),
+                    "naoqi_task_id:", self.current_naoqi_task_id)
+
+        # Cancel any external timeout timer
         self.cancel_speech_timeout()
-        
-        # Signal that speech has finished
+
+        # Clear the NAOqi task ID - this say() call is now complete
+        self.current_naoqi_task_id = None
+
+        # Signal that speech has finished - unblocks the wait() in process_text_message
         self.is_currently_speaking = False
         self.speech_finished_event.set()
 
         # Don't raise Speaking events directly - let speaking manager handle it
         logger.debug("Speech finished, letting speaking manager handle Speaking state")
-        
-        # Log queue status when speech finishes
+
         with self.queue_lock:
             queue_size = self.message_queue.qsize()
             logger.info("Speech finished. Messages still in queue:", queue_size)
@@ -298,22 +301,40 @@ class BaseSpeechReceiverModule(ALModule):
                 self.memory.raiseEvent("StopSpeaking", speech_id)
 
     def stop_current_speech(self):
-        """Stop current speech without triggering global StopAction (preserve queue)."""
+        """Stop current speech without triggering global StopAction (preserve queue).
+
+        Uses targeted speech.stop(task_id) when a NAOqi task ID is available so only
+        the active say() is cancelled.  Falls back to stopAll() otherwise.
+        Stopping the task causes ALAnimatedSpeech/EndOfAnimatedSpeech to fire, which
+        calls finished_speaking(), which sets speech_finished_event and unblocks the
+        wait() running in process_text_message on the queue worker thread.
+        """
         try:
             if self.is_currently_speaking:
-                # Stop animated speech / tts directly using cached proxies
-                try:
-                    if self.tts_proxy:
-                        self.tts_proxy.stopAll()
-                    else:
-                        tts = ALProxy("ALTextToSpeech")
-                        tts.stopAll()
-                except Exception:
-                    pass
-                try:
-                    self.speech.stopAll()
-                except Exception:
-                    pass
+                task_id = self.current_naoqi_task_id
+
+                # Prefer targeted stop; fall back to stopAll
+                stopped_targeted = False
+                if task_id is not None:
+                    try:
+                        self.speech.stop(task_id)
+                        logger.debug("Targeted speech.stop() issued for naoqi_task_id:", task_id)
+                        stopped_targeted = True
+                    except Exception as e:
+                        logger.warning("Targeted speech.stop() failed for task_id:", task_id, "error:", e)
+
+                if not stopped_targeted:
+                    try:
+                        if self.tts_proxy:
+                            self.tts_proxy.stopAll()
+                        else:
+                            ALProxy("ALTextToSpeech").stopAll()
+                    except Exception:
+                        pass
+                    try:
+                        self.speech.stopAll()
+                    except Exception:
+                        pass
 
                 # Signal running behaviour stopped
                 try:
@@ -321,13 +342,9 @@ class BaseSpeechReceiverModule(ALModule):
                 except Exception:
                     pass
 
-                # Wait for ALAnimatedSpeech end event (with timeout)
-                self.speech_finished_event.wait(timeout=2)
-                self.speech_finished_event.clear()
-
-                # Update state
-                self.is_currently_speaking = False
-                logger.debug("Current speech stopped (direct stop)")
+                # The stop triggers finished_speaking -> sets speech_finished_event.
+                # We do NOT wait here; the queue worker's own wait() handles the unblock.
+                logger.debug("Current speech stop issued (naoqi_task_id:", task_id, ")")
         except Exception as e:
             logger.error("Error stopping current speech:", e)
 
@@ -534,50 +551,69 @@ class BaseSpeechReceiverModule(ALModule):
             
             logger.info("Speech Output:\n================================\n", cleaned_text, "\n================================\n")
             
-            # Mark speaking state and notify speaking manager BEFORE speaking
+            # Ensure the finished event is clear before we submit the say() task
+            self.speech_finished_event.clear()
+
+            # Mark speaking state and notify speaking manager BEFORE speaking.
+            # Pass both our internal speech_id and the NAOqi task id (populated below)
+            # so the speaking manager can log and correlate task-level events.
             if not self.is_currently_speaking:
                 self.is_currently_speaking = True
-                
-                # Notify speaking manager
-                self.memory.raiseEvent("StartSpeaking", speech_id)
-                logger.info("Notified speaking manager to start speaking with speech_id:", speech_id)
+                # naoqi_task_id will be filled in immediately after post.say() below;
+                # raise StartSpeaking after we have it so the manager gets both IDs.
             else:
                 logger.debug("Already speaking, not toggling Speaking event")
 
             # Set running behaviour flag
             self.memory.raiseEvent("RunningBehaviour", True)
 
-            # Start speech timeout
-            self.start_speech_timeout(speech_id)
-
-            # Execute the speech with enhanced error handling and logging
+            # Submit speech non-blocking via post.say() to capture the NAOqi task ID.
+            # This lets us use targeted speech.stop(task_id) and pass the ID to the
+            # speaking manager for correlation with TextDone / TextInterrupted events.
             try:
-                logger.info("Executing speech.say() with text:", repr(cleaned_text[:100]))
-                # Execute the speech
-                logger.info("About to call speech.say() - speech_id:", speech_id)
-                self.speech.say(cleaned_text)
-                logger.info("speech.say() call completed successfully for speech_id:", speech_id)
-                
-                # Log the fact that we're waiting for the EndOfAnimatedSpeech event
-                logger.info("Waiting for ALAnimatedSpeech/EndOfAnimatedSpeech event for speech_id:", speech_id)
-                
+                logger.info("Submitting speech.post.say() - speech_id:", speech_id,
+                             "text:", repr(cleaned_text[:100]))
+                naoqi_task_id = self.speech.post.say(cleaned_text)
+                self.current_naoqi_task_id = naoqi_task_id
+                logger.info("speech.post.say() submitted - naoqi_task_id:", naoqi_task_id,
+                             "speech_id:", speech_id)
+
+                # Now raise StartSpeaking with both IDs
+                self.memory.raiseEvent("StartSpeaking",
+                                       {"speech_id": speech_id, "naoqi_task_id": naoqi_task_id})
+                logger.info("Notified speaking manager - speech_id:", speech_id,
+                             "naoqi_task_id:", naoqi_task_id)
+
             except Exception as speech_error:
-                logger.error("Error during speech.say() execution:", speech_error)
-                logger.error("Speech error details - Text length:", len(cleaned_text), "Speech ID:", speech_id)
-                
-                # Try to get more details about the error
+                logger.error("Error submitting speech.post.say() - speech_id:", speech_id,
+                             "error:", speech_error)
                 try:
                     import traceback
                     logger.error("Speech error traceback:", traceback.format_exc())
                 except:
                     pass
-                
-                # Cancel timeout and mark as not speaking
+
                 self.cancel_speech_timeout()
                 self.is_currently_speaking = False
+                self.current_naoqi_task_id = None
                 self.memory.raiseEvent("StopSpeaking", speech_id)
                 self.memory.raiseEvent("RunningBehaviour", False)
                 raise speech_error
+
+            # Block the queue worker until ALAnimatedSpeech/EndOfAnimatedSpeech fires
+            # (handled by finished_speaking -> speech_finished_event.set()).
+            # The timeout is a safety net; a targeted stop() from another thread will
+            # also trigger the event and unblock this wait.
+            logger.info("Waiting for speech to finish - speech_id:", speech_id,
+                         "naoqi_task_id:", naoqi_task_id)
+            completed = self.speech_finished_event.wait(timeout=self.SPEECH_TIMEOUT)
+
+            if not completed:
+                logger.error("Speech wait timed out - speech_id:", speech_id,
+                             "naoqi_task_id:", naoqi_task_id)
+                self.on_speech_timeout(speech_id)
+            else:
+                logger.info("Speech wait completed - speech_id:", speech_id)
 
         except Exception as e:
             logger.error("Error processing text message:", e)

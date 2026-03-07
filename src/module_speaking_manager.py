@@ -1,169 +1,148 @@
 import threading
 from naoqi import ALProxy, ALModule
-import time
 import logger
+
 
 class SpeakingStateManager(ALModule):
     """
-    Centralized manager for Speaking state to prevent race conditions
-    and ensure consistent state across all modules
+    Keep a single authoritative Speaking state.
+
+    This intentionally follows the simple pattern used in the
+    HakuHandler_WhenIGrowUp repo: rely on ALTextToSpeech events
+    (TextStarted/TextDone/TextInterrupted) and only emit Speaking when
+    the state actually changes.
     """
-    
+
     def __init__(self, name):
         ALModule.__init__(self, name)
         self.BIND_PYTHON(self.getName(), "callback")
-        
+
         self.memory = ALProxy("ALMemory")
-        
-        # Central speaking state
-        self._speaking = False
         self._speaking_lock = threading.Lock()
-        
-        # Queue management
-        self._pending_speech_count = 0
+        self._speaking = False
         self._current_speech_id = None
-        
-        # Subscribe to events that affect speaking state
+        self._naoqi_task_id = None
+
         self.memory.subscribeToEvent("StartSpeaking", self.getName(), "on_start_speaking")
         self.memory.subscribeToEvent("StopSpeaking", self.getName(), "on_stop_speaking")
-        self.memory.subscribeToEvent("QueueSpeech", self.getName(), "on_queue_speech")
-        self.memory.subscribeToEvent("DequeueResult", self.getName(), "on_dequeue_result")
-        self.memory.subscribeToEvent("StopAction", self.getName(), "on_clear_queue")
-        self.memory.subscribeToEvent("ClearQueue", self.getName(), "on_clear_queue")
+        self.memory.subscribeToEvent("StopAction", self.getName(), "on_force_stop")
+        self.memory.subscribeToEvent("ClearQueue", self.getName(), "on_force_stop")
+
+        self.memory.subscribeToEvent("ALTextToSpeech/TextStarted", self.getName(), "on_text_started")
         self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "on_speech_finished")
-        
+        self.memory.subscribeToEvent("ALTextToSpeech/TextInterrupted", self.getName(), "on_text_interrupted")
+
         logger.info("SpeakingStateManager initialized")
 
     def __del__(self):
-        """Enhanced destructor that handles all cleanup gracefully"""
         logger.info("cleaning everything")
-        
+
         try:
-            # Unsubscribe from events if memory is still available
-            if hasattr(self, 'memory'):
+            if hasattr(self, "memory"):
                 try:
                     self.memory.unsubscribeToEvent("StartSpeaking", self.getName())
                     self.memory.unsubscribeToEvent("StopSpeaking", self.getName())
-                    self.memory.unsubscribeToEvent("QueueSpeech", self.getName())
-                    self.memory.unsubscribeToEvent("DequeueResult", self.getName())
+                    self.memory.unsubscribeToEvent("StopAction", self.getName())
+                    self.memory.unsubscribeToEvent("ClearQueue", self.getName())
+                    self.memory.unsubscribeToEvent("ALTextToSpeech/TextStarted", self.getName())
                     self.memory.unsubscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName())
+                    self.memory.unsubscribeToEvent("ALTextToSpeech/TextInterrupted", self.getName())
                 except Exception as e:
                     logger.warning("Could not unsubscribe from speaking manager events:", e)
-                    
+
         except Exception as e:
             logger.error("Error during SpeakingStateManager cleanup:", e)
         finally:
             logger.info("cleaned up!")
 
-    def on_start_speaking(self, event_name, speech_id):
-        """Handle request to start speaking"""
+    def _set_speaking(self, speaking, reason=""):
         with self._speaking_lock:
-            was_speaking = self._speaking
-            self._speaking = True
+            if self._speaking == speaking:
+                return
+
+            self._speaking = speaking
+            self.memory.raiseEvent("Speaking", speaking)
+            if speaking:
+                logger.info("Speaking state changed to True", reason)
+            else:
+                logger.info("Speaking state changed to False", reason)
+
+    def _normalise_payload(self, payload):
+        if isinstance(payload, dict):
+            return payload.get("speech_id"), payload.get("naoqi_task_id")
+        return payload, None
+
+    def on_start_speaking(self, event_name, payload):
+        speech_id, naoqi_task_id = self._normalise_payload(payload)
+
+        with self._speaking_lock:
             self._current_speech_id = speech_id
-            
-            if not was_speaking:
-                # Only raise Speaking event if we weren't already speaking
-                self.memory.raiseEvent("Speaking", True)
-                logger.info("Speaking state changed to True (speech_id:", speech_id, ")")
-            else:
-                logger.debug("Already speaking, continuing with new speech (speech_id:", speech_id, ")")
+            self._naoqi_task_id = naoqi_task_id
 
-    def on_stop_speaking(self, event_name, speech_id):
-        """Handle request to stop speaking"""
-        with self._speaking_lock:
-            # Only stop if this is the current speech or if no specific ID provided
-            if speech_id is None or speech_id == self._current_speech_id:
-                was_speaking = self._speaking
-                self._speaking = False
-                self._current_speech_id = None
-                
-                if was_speaking:
-                    # Only raise Speaking False if we were actually speaking
-                    self.memory.raiseEvent("Speaking", False)
-                    logger.info("Speaking state changed to False (speech_id:", speech_id, ")")
-            else:
-                logger.debug("Ignoring stop request for different speech_id:", speech_id, "(current:", self._current_speech_id, ")")
+        logger.info("StartSpeaking received - speech_id:", speech_id, "naoqi_task_id:", naoqi_task_id)
+        self._set_speaking(True, "(StartSpeaking)")
 
-    def on_queue_speech(self, event_name, queue_info):
-        """Handle speech being added to queue"""
-        with self._speaking_lock:
-            self._pending_speech_count += 1
-            logger.debug("Speech queued, pending count:", self._pending_speech_count)
+    def on_stop_speaking(self, event_name, payload):
+        speech_id, _ = self._normalise_payload(payload)
 
-    def on_dequeue_result(self, event_name, queue_info):
-        """Handle speech being removed from queue"""
         with self._speaking_lock:
-            if self._pending_speech_count > 0:
-                self._pending_speech_count -= 1
-                logger.info("Speech dequeued, pending count:", self._pending_speech_count)
-                
-                # If no more pending speech and we're not currently speaking, ensure Speaking is False
-                if self._pending_speech_count == 0 and not self._speaking:
-                    self.memory.raiseEvent("Speaking", False)
-                    logger.info("Queue empty and not speaking, ensuring Speaking False")
-            else:
-                logger.warning("Received dequeue event but pending count was already 0")
+            current_speech_id = self._current_speech_id
+
+        if speech_id is not None and current_speech_id is not None and speech_id != current_speech_id:
+            logger.debug("Ignoring StopSpeaking for different speech_id:", speech_id, "(current:", current_speech_id, ")")
+            return
+
+        with self._speaking_lock:
+            self._current_speech_id = None
+            self._naoqi_task_id = None
+
+        logger.info("StopSpeaking received - speech_id:", speech_id)
+        self._set_speaking(False, "(StopSpeaking)")
+
+    def on_text_started(self, event_name, value):
+        # Mirror the simple Haku behavior exactly.
+        # Some NAOqi setups emit complementary True/False transitions.
+        if value:
+            self._set_speaking(True, "(TextStarted=True)")
+        else:
+            self._set_speaking(False, "(TextStarted=False)")
 
     def on_speech_finished(self, event_name, value):
-        """Handle end of animated speech"""
+        # ALAnimatedSpeech/EndOfAnimatedSpeech fires when speech AND animations complete.
+        # This is the authoritative signal that the entire utterance is done.
+        # (Compare to TextDone which only indicates speech completion; animations may still run.)
         with self._speaking_lock:
-            logger.info("Speech finished event received. Current state: speaking=", self._speaking, ", pending_count=", self._pending_speech_count)
-            
-            # Check if there are pending messages in the queue
-            if self._pending_speech_count > 0:
-                logger.info("Speech finished but", self._pending_speech_count, "messages pending, keeping Speaking True")
-                # Don't change speaking state - let queue worker handle the next message
-            else:
-                # No pending messages, safe to set Speaking to False
-                was_speaking = self._speaking
-                self._speaking = False
-                self._current_speech_id = None
-                
-                if was_speaking:
-                    self.memory.raiseEvent("Speaking", False)
-                    logger.info("Speech finished and queue empty, Speaking state changed to False")
-                else:
-                    logger.debug("Speech finished, Speaking was already False")
-
-    def on_clear_queue(self, event_name, value):
-        """Handle clearing of the speech queue"""
-        with self._speaking_lock:
-            self._pending_speech_count = 0
-            logger.info("Speech queue cleared, pending count reset to 0")
-            
-            # Always ensure Speaking is False when queue is cleared
-            was_speaking = self._speaking
-            self._speaking = False
             self._current_speech_id = None
-            
-            # Always raise Speaking False event when queue is cleared to ensure consistency
-            self.memory.raiseEvent("Speaking", False)
-            if was_speaking:
-                logger.info("Speaking state changed to False after queue clear")
-            else:
-                logger.info("Speaking state confirmed False after queue clear")
+            self._naoqi_task_id = None
+
+        self._set_speaking(False, "(EndOfAnimatedSpeech)")
+
+    def on_text_interrupted(self, event_name, value):
+        # Mirror Haku behavior: interruption True => speaking ended.
+        if value:
+            with self._speaking_lock:
+                self._current_speech_id = None
+                self._naoqi_task_id = None
+            self._set_speaking(False, "(TextInterrupted=True)")
+
+    def on_force_stop(self, event_name, value):
+        with self._speaking_lock:
+            self._current_speech_id = None
+            self._naoqi_task_id = None
+
+        self._set_speaking(False, "(" + str(event_name) + ")")
 
     def get_speaking_state(self):
-        """Get current speaking state (thread-safe)"""
         with self._speaking_lock:
             return self._speaking
 
     def force_speaking_state(self, speaking, reason="manual"):
-        """Force speaking state (for emergency situations)"""
-        with self._speaking_lock:
-            was_speaking = self._speaking
-            self._speaking = speaking
-            
-            if was_speaking != speaking:
-                self.memory.raiseEvent("Speaking", speaking)
-                logger.info("Speaking state forced to", speaking, "reason:", reason)
+        self._set_speaking(speaking, "(forced: " + str(reason) + ")")
 
     def get_status(self):
-        """Get detailed status for debugging"""
         with self._speaking_lock:
             return {
                 "speaking": self._speaking,
                 "current_speech_id": self._current_speech_id,
-                "pending_count": self._pending_speech_count
+                "naoqi_task_id": self._naoqi_task_id,
             }
