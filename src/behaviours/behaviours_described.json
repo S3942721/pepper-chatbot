@@ -1342,5 +1342,22 @@
             "hungarian_parts-4e01cb/pt6_mute"
         ],
         "must_complete": true
+    },
+    {
+        "action_description": "Does a random dance out the different full dances available", 
+        "behaviour_key": "random_dance_full", 
+        "behaviour_variations": [
+            "hungarian-a7c2ea",
+            "mika_relax-2c3b38",
+            "la_bamba-2bcabb",
+            "walk_this_way-553cea",
+            "danceofthereedflutes-93ba8f",
+            "asereje-9e71b3",
+            "danceoftheknights-169092",
+            "naoanimations-5e61c9/disco_w_music",
+            "naoanimations-5e61c9/saxaphone"
+
+        ],
+        "must_complete": true
     }
 ]

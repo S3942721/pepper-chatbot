@@ -146,12 +146,14 @@ class GreetingsModule(ALModule):
 
             self.memory.raiseEvent('Say', str(greeting))
             self.memory.subscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName(), "greeting_finished")
+            self.memory.subscribeToEvent("ALTextToSpeech/TextInterrupted", self.getName(), "greeting_finished")
             self.waiting_for_greeting = True
             self.last_spoken_time = current_time
 
     def greeting_finished(self, event_name, value):
         # Consider eye contact seen after greeting to prevent immediate re-greeting if face is lost mid greeting
         self.memory.unsubscribeToEvent("ALAnimatedSpeech/EndOfAnimatedSpeech", self.getName())
+        self.memory.unsubscribeToEvent("ALTextToSpeech/TextInterrupted", self.getName())
         self.waiting_for_greeting = False
         if self.require_face_lost:
             logger.info("Greeting finished")

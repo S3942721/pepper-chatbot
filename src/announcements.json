@@ -150,6 +150,18 @@
         "^start(hey) Welcome, let's kick off the fun!"
     ],
     "Default Greetings": [
+        "^start(hey) Hey there! Watch this! ^run(random_dance_full)",
+        "^start(hey) I'm Haku, nice to meet you! ^run(random_dance_full)",
+        "^start(hey) Hello! I'm Haku. ^run(random_dance_full)",
+        "^start(hey) Hi! I'm Haku, and I love to dance! ^run(random_dance_full)",
+        "^start(hey) Welcome! Let's dance together! ^run(random_dance_full)",
+        "^start(hey) Greetings! I'm Haku, your dancing robot! ^run(random_dance_full)",
+        "^start(hey) Hey! I'm Haku. Ready to see some moves? ^run(random_dance_full)",
+        "^start(hey) Hi there! I'm Haku, and I can dance! ^run(random_dance_full)",
+        "^start(hey) Hello! I'm Haku, and I have some great dance moves! ^run(random_dance_full)",
+        "^start(hey) Welcome! I'm Haku, and I love to dance! ^run(random_dance_full)"
+    ],
+    "Default Greetings 1": [
         "^start(hey) Welcome to New Members Day at RMIT. get ready for a soccer match!",
         "^start(hey) Welcome to New Members Day at RMIT. get ready for a chance to learn coding robots!",
         "^start(hey) Hi, glad you joined us for the soccer match on New Members Day! Enjoy the day!",
